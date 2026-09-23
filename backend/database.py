@@ -2,7 +2,7 @@
 import sqlite3
 import json
 
-DB_FILE = "climbing_analytics.db"
+DB_FILE = "../output_data/climbing_analytics.db"
 
 def init_db():
     """Creates the historical database tables if they do not exist."""
