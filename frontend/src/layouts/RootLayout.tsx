@@ -1,18 +1,23 @@
-// src/layouts/RootLayout.tsx
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import {Links, Meta, Scripts, ScrollRestoration} from "react-router";
 
-export default function RootLayout(): React.JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
+        <html lang="en">
+        <head>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Scale</title>
+            <Links />
+            <Meta />
+        </head>
+        <body>
         <div className="app-container">
-            {/*
-        You can plug a shared Bootstrap Navbar or Sidebar here later.
-        It will stay rendered statically while only the content inside
-        the <Outlet /> swaps when switching between Home and Analytics.
-      */}
-            <main>
-                <Outlet />
-            </main>
+            {children}
         </div>
+        <ScrollRestoration />
+        <Scripts />
+        </body>
+        </html>
     );
 }

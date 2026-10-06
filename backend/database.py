@@ -1,6 +1,5 @@
 # app/database.py
 import sqlite3
-import json
 
 DB_FILE = "../output_data/climbing_analytics.db"
 
@@ -22,16 +21,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_analytics(test_id, test_type, cf, w_prime, r_sq, peaks_list):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO test_results 
-        (test_id, timestamp, test_type, critical_force_kg, w_prime_joules, r_squared, set_peaks_json)
-        VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
-    """, (test_id, test_type, cf, w_prime, r_sq, json.dumps(peaks_list)))
-    conn.commit()
-    conn.close()
 
 def get_all_tests():
     conn = sqlite3.connect(DB_FILE)

@@ -4,16 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "router-build": "react-router build",
+    "router-build": "react-router build && copy run_scripts build\\client",
     "router-dev": "react-router dev",
     "router-start": "react-router-serve ./build/server/index.js",
-    "reouter-typecheck": "react-router typegen && tsc",
+    "router-typecheck": "react-router typegen && tsc",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "axios": "^1.20.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",
@@ -32,7 +33,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "oxlint": "^1.81.0",
     "sass": "^1.104.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"

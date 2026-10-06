@@ -1,3 +1,4 @@
 export const config = {
-    serverUrl: 'ws://localhost:8000/ws'
+    webSocketEndpoint: 'ws://localhost:8000/ws',
+    apiEndpoint: 'http://localhost:8000/api',
 }

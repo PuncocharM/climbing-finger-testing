@@ -1,12 +1,13 @@
 import asyncio
+import logging
+import sys
 import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from enum import StrEnum
 
 import pandas as pd
-import scipy.stats as sps
-import scipy.integrate as spi
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import serial
@@ -14,15 +15,10 @@ import json
 import csv
 from pydantic import BaseModel
 
-from database import init_db, save_analytics, get_all_tests, get_test_by_id, delete_test_by_id
+from config import SERIAL_PORT, BAUD_RATE, PORT, BROADCAST_FREQUENCY, LOG_FILE_DATA, LOG_FILE_EVENTS, LOG_BUFFER_SIZE
+from data_analysis import process_test_analytics
+from database import init_db, get_all_tests, get_test_by_id, delete_test_by_id
 
-SERIAL_PORT = "COM6"
-BAUD_RATE = 115200
-PORT = 8000
-BROADCAST_FREQUENCY = 1 / 10 # Broadcast every 100ms (matches ESP32 output rate 10Hz)
-LOG_FILE_DATA = "../output_data/log-data.csv"
-LOG_FILE_EVENTS = "../output_data/log-events.csv"
-LOG_BUFFER_SIZE = 80
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,9 +27,12 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(broadcast_data_stream())
     yield
 
+
+log = logging.getLogger()
+# logger.setLevel(logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 app = FastAPI(lifespan=lifespan, title="ESP32 Load Cell Telemetry Server")
 init_db()
-# Allow requests from your HTML/JS frontend
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,10 +41,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- Global State Variables ---
-latest_weight = 0.0
-esp32_status = "UNKNOWN"
-ser: serial.Serial | None = None
+
+class ConnectionStatus(StrEnum):
+    ERROR = "ERROR"
+    CONNECTING = "CONNECTING"
+    CONNECTED = "CONNECTED"
+
+class ESP32:
+    _connection_status: ConnectionStatus
+    _status: str
+    _latest_weight: float
+    _ser: serial.Serial | None = None
+
+    def set_connection_status(self, connection_status: ConnectionStatus):
+        log.info(f"ESP32 connection status: {connection_status}")
+        self._connection_status = connection_status
+
+    def get_connection_status(self):
+        return self._connection_status
+
+    def set_status(self, status: str):
+        log.info(f"ESP32 status: {status}")
+        self._status = status
+
+    def get_status(self):
+        return self._status
+
+    def set_latest_weight(self, latest_weight: float):
+        log.debug(f"Registered weight: {latest_weight}")
+        self._latest_weight = latest_weight
+
+    def get_latest_weight(self):
+        return self._latest_weight
+
+    def set_ser(self, ser: serial.Serial):
+        self._ser = ser
+
+    def get_ser(self):
+        return self._ser
+
+
 
 class FrontendEvent(BaseModel):
     test_id: str
@@ -53,105 +88,31 @@ class FrontendEvent(BaseModel):
     event_type: str
 
 
+esp32 = ESP32()
 connected_clients = set()
 
 
-
-def process_test_analytics(test_id: str):
-    """Slices out the 80 Hz logging file chunks matching the active TestID to find CF and W'."""
-    try:
-        time.sleep(1.5) # Allow final logging buffers to flush to disk
-        df_data = pd.read_csv(LOG_FILE_DATA, names=["timestamp", "weight", "status"])\
-            .set_index("timestamp")
-        df_events = pd.read_csv(LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])\
-            .set_index("timestamp")
-
-        # Isolate rows captured under this specific TestID
-        df_events_test = df_events.loc[df_events['test_id'] == test_id]
-        if df_events_test.empty:
-            print(f"Analytics failure: No data found matching {test_id}")
-            return
-
-        # Locate individual phase transition boundaries
-        set_peaks = []
-        cumulative_work = []
-        cumulative_time = []
-
-        total_work_done = 0.0
-        total_time_seconds = 0.0
-
-        pull_start = None
-        for timestamp, event_row in df_events_test.iterrows():
-            event = event_row["event"]
-            if event == "PULL_START":
-                pull_start = timestamp
-            elif event == "REST_START" or event == "TEST_END":
-                pull_data = df_data.loc[(df_data.index >= pull_start) & (df_data.index < timestamp), "weight"]
-
-                if len(pull_data) > 0:
-                    peak = float(pull_data.max())
-                    set_peaks.append(peak)
-
-                    # Compute Work (Impulse) via linear trapezoidal integration modeling
-                    set_work = float(spi.trapezoid(pull_data.values, dx=(1.0 / 80.0)))
-                    total_work_done += set_work
-                    # TODO: make the timestamp difference
-                    total_time_seconds += 7.0 # Standard work block time allocation
-
-                    cumulative_work.append(total_work_done)
-                    cumulative_time.append(total_time_seconds)
-                else:
-                    print(f"No data in the pull interval {pull_start}, {timestamp}")
-
-        if len(cumulative_work) < 2:
-            print("Not enough cumulative work")
-            print(set_peaks, cumulative_work, cumulative_time)
-            print(df_events_test)
-            print(df_data)
-            return # Insufficient data to execute reliable linear regressions
-
-        # Execute Monod-Scherrer Linear Model Mapping
-        # Cumulative Work = (Critical Force * Cumulative Time) + W'
-        slope, intercept, r_value, p_value, std_err = sps.linregress(cumulative_time, cumulative_work)
-
-        # Save metrics directly into SQLite
-        save_analytics(
-            test_id=test_id,
-            test_type="CRITICAL_FORCE_7_3",
-            cf=round(slope, 2),
-            w_prime=round(intercept, 2),
-            r_sq=round(r_value**2, 4),
-            peaks_list=set_peaks
-        )
-        print(f"Successfully processed analytics for {test_id}. CF: {round(slope,2)}kg, W': {round(intercept,2)}J")
-    except Exception as e:
-        print(f"Error executing mathematical analytics engine processing: {str(e)}")
-
-
-
-
 def serial_reader_worker():
-    global latest_weight, esp32_status, ser
-    print(f"Connecting to ESP32...")
-    esp32_status = "CONNECTING"
-
     buffer = []
 
     while True:
         try:
-            if ser is None or not ser.is_open:
-                ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+            if esp32.get_ser() is None or not esp32.get_ser().is_open:
+                esp32.set_connection_status(ConnectionStatus.CONNECTING)
+                esp32.set_ser(serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1))
                 time.sleep(2)
-                esp32_status = "CONNECTED"
-                print("Connected to ESP32")
+                continue
+            elif esp32.get_connection_status() != ConnectionStatus.CONNECTED:
+                esp32.set_connection_status(ConnectionStatus.CONNECTED)
 
-            if ser.in_waiting > 0:
-                line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if esp32.get_ser().in_waiting > 0:
+                line = esp32.get_ser().readline().decode('utf-8', errors='ignore').strip()
                 if line.startswith("DATA:"):
                     try:
-                        latest_weight = float(line.split(":")[1])
+                        current_weight = float(line.split(":")[1])
+                        esp32.set_latest_weight(current_weight)
                         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-                        buffer.append([timestamp, latest_weight, esp32_status])
+                        buffer.append([timestamp, current_weight, esp32.get_connection_status()])
 
                         if len(buffer) >= LOG_BUFFER_SIZE:
                             with open(LOG_FILE_DATA, "a", newline="") as f:
@@ -159,16 +120,23 @@ def serial_reader_worker():
                                 writer.writerows(buffer)
                             buffer.clear()
 
-                    except (ValueError, IndexError):
-                        pass
+                    except (ValueError, IndexError) as e:
+                        log.error(f"Error reading data: {e}")
                 elif line.startswith("STATUS:"):
-                    print("Status:", line)
+                    status = line[len("STATUS:"):].strip()
+                    if status.startswith("CALIBRATED "):
+                        calibration_factor = float(status[len("CALIBRATED "):].strip())
+                        log.info(f"Calibrated factor: {calibration_factor}")
+                        status = "CALIBRATED"
+                    esp32.set_status(status)
                 elif line.startswith("ERROR:"):
-                    print("Scale error:", line)
+                    log.error(f"Scale error: {line}")
                 else:
-                    print("Unrecognized message:", line)
+                    log.error(f"Unrecognized message: {line}" )
 
-        except (serial.SerialException, OSError):
+        except serial.SerialException as e:
+            log.error(f"ESP32 connection error: {e}")
+            esp32.set_connection_status(ConnectionStatus.ERROR)
             time.sleep(3)
 
 
@@ -176,10 +144,10 @@ def serial_reader_worker():
 async def broadcast_data_stream():
     """Continuously pushes data to all connected browser clients at 10Hz."""
     while True:
-        if connected_clients:
+        if connected_clients and esp32.get_connection_status() == ConnectionStatus.CONNECTED:
             payload = {
-                "weight": latest_weight,
-                "status": esp32_status
+                "weight": esp32.get_latest_weight(),
+                "status": esp32.get_connection_status()
             }
 
             message = json.dumps(payload)
@@ -194,30 +162,30 @@ async def broadcast_data_stream():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.add(websocket)
-    print(f"Client connected. Active connections: {len(connected_clients)}")
+    log.info(f"Client connected. Active connections: {len(connected_clients)}")
 
     try:
         while True:
             # Listen for incoming control commands from the browser front-end
             data = await websocket.receive_text()
-            try:
-                command_data = json.loads(data)
-                cmd = command_data.get("command", "").upper()
-
-                if cmd in ["TARE", "START", "STOP"] and ser and ser.is_open:
-                    ser.write(f"{cmd}\n".encode('utf-8'))
-                    print(f"Forwarded command to ESP32: {cmd}")
-            except json.JSONDecodeError:
-                pass
+            # try:
+            #     command_data = json.loads(data)
+            #     cmd = command_data.get("command", "").upper()
+            #
+            #     if cmd in ["TARE", "START", "STOP"] and esp32.get_ser() and esp32.get_ser().is_open:
+            #         esp32.get_ser().write(f"{cmd}\n".encode('utf-8'))
+            #         log.info(f"Forwarded command to ESP32: {cmd}")
+            # except json.JSONDecodeError:
+            #     pass
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
-        print(f"Client disconnected. Active connections: {len(connected_clients)}")
+        log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
 
 
 @app.get("/api/weight")
 def get_weight():
     """Returns the latest read weight and current connection status."""
-    return {"weight": latest_weight, "status": esp32_status}
+    return {"weight": esp32.get_latest_weight(), "connection_status": esp32.get_connection_status()}
 
 
 @app.post("/api/test/sync")
@@ -225,9 +193,8 @@ async def log_phase_marker(frontend_event: FrontendEvent, background_tasks: Back
     """
     Injects a runtime phase transition marker into the active CSV logging stream.
     """
-    global esp32_status
     try:
-        log_row = [frontend_event.timestamp, f"{frontend_event.event_type}", esp32_status, frontend_event.test_id]
+        log_row = [frontend_event.timestamp, f"{frontend_event.event_type}", esp32.get_connection_status(), frontend_event.test_id]
 
         with open(LOG_FILE_EVENTS, "a", newline="") as f:
             csv.writer(f).writerow(log_row)
@@ -313,35 +280,41 @@ def fetch_single_test_details(test_id: str):
 
 
 
-@app.post("/api/command/{cmd}")
-def send_command(cmd: str):
-    """Sends control commands (TARE, START, STOP) to the ESP32."""
-    global ser
-    valid_commands = ["TARE", "START", "STOP"]
-    upper_cmd = cmd.upper()
-
-    if upper_cmd not in valid_commands:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid command. Choose from: {valid_commands}",
-        )
-
+@app.post("/api/command/calibrate")
+def calibrate(weight: float):
+    ser = esp32.get_ser()
     if ser is None or not ser.is_open:
-        raise HTTPException(
-            status_code=503, detail="Serial port to ESP32 is not open."
-        )
+        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
 
     try:
-        # Send raw string command appended with a newline token
-        ser.write(f"{upper_cmd}\n".encode("utf-8"))
+        ser.write(f"calibrate {weight}\n".encode("utf-8"))
         return {
             "success": True,
-            "message": f"Command '{upper_cmd}' sent to ESP32.",
+            "message": f"Calibration command sent to ESP32.",
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to transmit command: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
+
+
+@app.post("/api/command/{cmd}")
+def send_command(cmd: str):
+    valid_commands = ["tare", "start", "stop"]
+
+    if cmd not in valid_commands:
+        raise HTTPException(status_code=400,detail=f"Invalid command. Choose from: {valid_commands}")
+
+    ser = esp32.get_ser()
+    if ser is None or not ser.is_open:
+        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
+
+    try:
+        ser.write(f"{cmd}\n".encode("utf-8"))
+        return {
+            "success": True,
+            "message": f"Command '{cmd}' sent to ESP32.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
 
 @app.delete("/api/history/{test_id}")
 def delete_test(test_id: str):
@@ -359,5 +332,7 @@ def delete_test(test_id: str):
 # Run via command line: uvicorn app:app --reload --host 0.0.0.0 --port 8000
 if __name__ == "__main__":
     import uvicorn
+
+    logging.basicConfig(level=logging.INFO)
 
     uvicorn.run(app, host="0.0.0.0", port=PORT)

@@ -1,7 +1,7 @@
 // app/routes/history.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import "../styles/common.scss"
+import "../../styles/common.scss"
 
 interface HistoricalTestRecord {
     test_id: string;

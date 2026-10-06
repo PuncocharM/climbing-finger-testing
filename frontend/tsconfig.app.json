@@ -7,8 +7,7 @@
     "rootDirs": [".", "./.react-router/types"],
     "typeRoots": [ "./node_modules/@types"],
     "types": ["vite/client", "node"],
-    "allowArbitraryExtensions": true,
-    "skipLibCheck": true,
+
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -22,7 +21,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["**/*"],
   "exclude": ["node_modules"],
