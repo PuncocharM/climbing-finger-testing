@@ -1,10 +1,12 @@
 # app/database.py
 import sqlite3
 
-DB_FILE = "../output_data/climbing_analytics.db"
+from config import DB_FILE
+
 
 def init_db():
     """Creates the historical database tables if they do not exist."""
+    DB_FILE.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""

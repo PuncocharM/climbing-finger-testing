@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "router-build": "react-router build && copy run_scripts build\\client",
+    "package": "bash package.sh",
+    "router-build": "react-router build && bash package.sh",
     "router-dev": "react-router dev",
     "router-start": "react-router-serve ./build/server/index.js",
     "router-typecheck": "react-router typegen && tsc",

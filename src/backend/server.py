@@ -15,7 +15,7 @@ import json
 import csv
 from pydantic import BaseModel
 
-from config import SERIAL_PORT, BAUD_RATE, PORT, BROADCAST_FREQUENCY, LOG_FILE_DATA, LOG_FILE_EVENTS, LOG_BUFFER_SIZE
+from config import SERIAL_PORT, BAUD_RATE, DEFAULT_PORT, BROADCAST_FREQUENCY, LOG_FILE_DATA, LOG_FILE_EVENTS, LOG_BUFFER_SIZE
 from data_analysis import process_test_analytics
 from database import init_db, get_all_tests, get_test_by_id, delete_test_by_id
 
@@ -32,6 +32,7 @@ log = logging.getLogger()
 # logger.setLevel(logging.DEBUG)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 app = FastAPI(lifespan=lifespan, title="ESP32 Load Cell Telemetry Server")
+app.frontend('/', directory='static', fallback="index.html")
 init_db()
 
 app.add_middleware(
@@ -93,6 +94,8 @@ connected_clients = set()
 
 
 def serial_reader_worker():
+    time.sleep(1)
+
     buffer = []
 
     while True:
@@ -142,7 +145,8 @@ def serial_reader_worker():
 
 
 async def broadcast_data_stream():
-    """Continuously pushes data to all connected browser clients at 10Hz."""
+    time.sleep(1)
+
     while True:
         if connected_clients and esp32.get_connection_status() == ConnectionStatus.CONNECTED:
             payload = {
@@ -335,4 +339,14 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            print('Error: port has to be an integer')
+            exit(1)
+    else:
+        port = DEFAULT_PORT
+
+
+    uvicorn.run(app, host="0.0.0.0", port=port)

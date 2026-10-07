@@ -8,7 +8,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import PORT, BROADCAST_FREQUENCY
+from config import DEFAULT_PORT, BROADCAST_FREQUENCY
 from database import init_db
 
 
@@ -72,4 +72,4 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=DEFAULT_PORT)
