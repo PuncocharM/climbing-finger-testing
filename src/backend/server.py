@@ -51,7 +51,8 @@ class ConnectionStatus(StrEnum):
 class ESP32:
     _connection_status: ConnectionStatus = ConnectionStatus.DISCONNECTED
     _status: str
-    _latest_weight: float | None= None
+    _current_weight: float | None = None
+    _max_weight: float | None = None
     _ser: serial.Serial | None = None
 
     def set_connection_status(self, connection_status: ConnectionStatus):
@@ -68,12 +69,12 @@ class ESP32:
     def get_status(self):
         return self._status
 
-    def set_latest_weight(self, latest_weight: float | None):
-        log.debug(f"Registered weight: {latest_weight}")
-        self._latest_weight = latest_weight
+    def set_current_weight(self, current_weight: float | None):
+        log.debug(f"Registered current weight: {current_weight}")
+        self._current_weight = current_weight
 
-    def get_latest_weight(self):
-        return self._latest_weight
+    def get_current_weight(self):
+        return self._current_weight
 
     def set_ser(self, ser: serial.Serial | None):
         self._ser = ser
@@ -81,20 +82,16 @@ class ESP32:
     def get_ser(self):
         return self._ser
 
+    def set_max_weight(self, max_weight):
+        self._max_weight = max_weight
 
-
-class FrontendEvent(BaseModel):
-    test_id: str
-    timestamp: str
-    event_type: str
+    def get_max_weight(self):
+        return self._max_weight
 
 
 esp32 = ESP32()
-connected_clients = set()
-
-
 def serial_reader_worker():
-    time.sleep(1)
+    time.sleep(1)  # wait a bit on server startup
 
     buffer = []
 
@@ -110,10 +107,10 @@ def serial_reader_worker():
 
             if esp32.get_ser().in_waiting > 0:
                 line = esp32.get_ser().readline().decode('utf-8', errors='ignore').strip()
-                if line.startswith("DATA:"):
+                if line.startswith("DATA:CURRENT_WEIGHT:"):
                     try:
-                        current_weight = float(line.split(":")[1])
-                        esp32.set_latest_weight(current_weight)
+                        current_weight = float(line.split(":")[2])
+                        esp32.set_current_weight(current_weight)
                         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                         buffer.append([timestamp, current_weight, esp32.get_connection_status()])
 
@@ -124,7 +121,14 @@ def serial_reader_worker():
                             buffer.clear()
 
                     except (ValueError, IndexError) as e:
-                        log.error(f"Error reading data: {e}")
+                        log.error(f"Error reading current weight: {e}")
+                elif line.startswith("DATA:MAX_WEIGHT:"):
+                    try:
+                        max_weight = float(line.split(":")[2])
+                        esp32.set_max_weight(max_weight)
+                    except (ValueError, IndexError) as e:
+                        log.error(f"Error reading max weight: {e}")
+
                 elif line.startswith("STATUS:"):
                     status = line[len("STATUS:"):].strip()
                     if status.startswith("CALIBRATED "):
@@ -140,19 +144,20 @@ def serial_reader_worker():
         except serial.SerialException as e:
             log.error(f"ESP32 connection error: {e}")
             esp32.set_connection_status(ConnectionStatus.DISCONNECTED)
-            esp32.set_latest_weight(None)
+            esp32.set_current_weight(None)
             esp32.set_ser(None)
             time.sleep(3)
 
 
-
+connected_clients = set()
 async def broadcast_data_stream():
-    time.sleep(1)
+    time.sleep(1)  # wait a bit on server startup
 
     while True:
         if connected_clients:
             payload = {
-                "weight": esp32.get_latest_weight(),
+                "current_weight": esp32.get_current_weight(),
+                "max_weight": esp32.get_max_weight(),
                 "status": esp32.get_connection_status()
             }
 
@@ -162,6 +167,7 @@ async def broadcast_data_stream():
                 return_exceptions=True
             )
         await asyncio.sleep(BROADCAST_FREQUENCY)
+
 
 
 @app.websocket("/ws")
@@ -191,21 +197,26 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/api/weight")
 def get_weight():
     """Returns the latest read weight and current connection status."""
-    return {"weight": esp32.get_latest_weight(), "connection_status": esp32.get_connection_status()}
+    return {"weight": esp32.get_current_weight(), "connection_status": esp32.get_connection_status()}
 
+
+class TestEvent(BaseModel):
+    test_id: str
+    timestamp: str
+    event_type: str
 
 @app.post("/api/test/sync")
-async def log_phase_marker(frontend_event: FrontendEvent, background_tasks: BackgroundTasks):
+async def log_phase_marker(test_event: TestEvent, background_tasks: BackgroundTasks):
     try:
-        log_row = [frontend_event.timestamp, f"{frontend_event.event_type}", esp32.get_connection_status(), frontend_event.test_id]
+        log_row = [test_event.timestamp, f"{test_event.event_type}", esp32.get_connection_status(), test_event.test_id]
 
         with open(LOG_FILE_EVENTS, "a", newline="") as f:
             csv.writer(f).writerow(log_row)
 
-        if frontend_event.event_type == "TEST_END":
-            background_tasks.add_task(process_test_analytics, frontend_event.test_id)
+        if test_event.event_type == "TEST_END":
+            background_tasks.add_task(process_test_analytics, test_event.test_id)
 
-        print(f"[{frontend_event.timestamp}] Recorded frontend event: {frontend_event.event_type}")
+        print(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to record event marker: {str(e)}")
@@ -275,43 +286,37 @@ def fetch_single_test_details(test_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to compile raw timeseries: {str(e)}")
 
 
+def _send_command(command: str):
+    ser = esp32.get_ser()
+    if ser is None or not ser.is_open:
+        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
 
+    try:
+        ser.write(f"{command}\n".encode("utf-8"))
+        return {
+            "success": True,
+            "message": f"Command sent to ESP32.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
 
 @app.post("/api/command/calibrate")
 def calibrate(weight: float):
-    ser = esp32.get_ser()
-    if ser is None or not ser.is_open:
-        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
+    return _send_command(f"calibrate {weight}")
 
-    try:
-        ser.write(f"calibrate {weight}\n".encode("utf-8"))
-        return {
-            "success": True,
-            "message": f"Calibration command sent to ESP32.",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
+
+class Commands(StrEnum):
+    TARE = "tare"
+    START = "start"
+    STOP = "stop"
+    RESET_MAX_WEIGHT = "reset_max_weight"
 
 
 @app.post("/api/command/{cmd}")
-def send_command(cmd: str):
-    valid_commands = ["tare", "start", "stop"]
+def send_command(cmd: Commands):
+    return _send_command(cmd)
 
-    if cmd not in valid_commands:
-        raise HTTPException(status_code=400,detail=f"Invalid command. Choose from: {valid_commands}")
 
-    ser = esp32.get_ser()
-    if ser is None or not ser.is_open:
-        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
-
-    try:
-        ser.write(f"{cmd}\n".encode("utf-8"))
-        return {
-            "success": True,
-            "message": f"Command '{cmd}' sent to ESP32.",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
 
 @app.delete("/api/history/{test_id}")
 def delete_test(test_id: str):

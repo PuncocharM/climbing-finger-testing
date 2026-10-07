@@ -1,4 +1,5 @@
 import axios from "axios";
+import {config} from "../config.ts";
 
 export enum TestPhase {
     idle = "idle",
@@ -52,7 +53,7 @@ export function sendPhaseSync (event: TestPhaseEvent, test_id: string | null) {
 
     const syncTimestamp = new Date().toISOString();
     axios.post(
-        "http://localhost:8000/api/test/sync",
+        config.apiEndpoint + "/test/sync",
         JSON.stringify({
             test_id: test_id,
             timestamp: syncTimestamp,

@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {config} from "../config.ts";
+import axios from "axios";
 
 enum ConnectionStatus {
     connecting = 'connecting',
@@ -8,7 +9,8 @@ enum ConnectionStatus {
 }
 
 interface TelemetryData {
-    weight: number | null;
+    current_weight: number | null;
+    max_weight: number | null;
     status: string;
 }
 
@@ -16,7 +18,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
     displayMaxWeight: boolean,
     resetWeightRef?: React.RefObject<(() => void) | null>
 }) {
-    const [weight, setWeight] = useState<number | null>(null);
+    const [currentWeight, setCurrentWeight] = useState<number | null>(null);
     const [maxWeight, setMaxWeight] = useState<number | null>(null);
     const [espStatus, setEspStatus] = useState<string>('Unknown');
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.disconnected);
@@ -30,9 +32,9 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
         ws.onmessage = (event: MessageEvent) => {
             try {
                 const data: TelemetryData = JSON.parse(event.data);
-                setWeight(data.weight);
+                setCurrentWeight(data.current_weight);
+                setMaxWeight(data.max_weight);
                 setEspStatus(data.status);
-                setMaxWeight((prevMax) => (data.weight != null && (prevMax == null || data.weight > prevMax) ? data.weight : prevMax));
             } catch (error) {
                 console.error('Failed to parse incoming telemetry payload:', error);
             }
@@ -75,7 +77,10 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
     }
 
 
-    function resetMaxWeight() {setMaxWeight(null)}
+    function resetMaxWeight() {
+        axios.post(config.apiEndpoint + "/command/reset_max_weight")
+            .catch(e => console.error("Error sending reset max weight command: " + e));
+    }
 
     if (resetWeightRef != null) {
         resetWeightRef.current = resetMaxWeight
@@ -86,7 +91,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
             <div className="row">
                 <div className={displayMaxWeight ? "col-6 border-end border-dark" : "col-12"}>
                   <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
-                    <div className="h2 font-monospace fw-bold text-success my-2">{weight ? weight.toFixed(2) : "-"}</div>
+                    <div className="h2 font-monospace fw-bold text-success my-2">{currentWeight ? currentWeight.toFixed(2) : "-"}</div>
                 </div>
                 {displayMaxWeight && (
                     <div className="col-6">
