@@ -5,16 +5,15 @@ import time
 import pandas as pd
 from scipy import integrate as spi, stats as sps
 
-from database import DB_FILE
-from config import LOG_FILE_DATA, LOG_FILE_EVENTS
+from config import Config
 
 
 def process_test_analytics(test_id: str):
     try:
         time.sleep(1.5) # Allow final logging buffers to flush to disk
-        df_data = pd.read_csv(LOG_FILE_DATA, names=["timestamp", "weight", "status"])\
+        df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])\
             .set_index("timestamp")
-        df_events = pd.read_csv(LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])\
+        df_events = pd.read_csv(Config.LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])\
             .set_index("timestamp")
 
         # Isolate rows captured under this specific TestID
@@ -80,7 +79,7 @@ def process_test_analytics(test_id: str):
 
 
 def save_analytics(test_id, test_type, cf, w_prime, r_sq, peaks_list):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(Config.DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT OR REPLACE INTO test_results 

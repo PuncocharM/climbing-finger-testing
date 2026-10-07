@@ -1,12 +1,23 @@
 import React, {useRef, useState} from 'react';
 import {useNavigate} from 'react-router';
 import "../../styles/common.scss"
-import {generateTestId, getPhaseStyles, playBeep, sendPhaseSync, TestPhase, TestPhaseEvent,} from "./test-commons.ts";
+import {
+    generateTestId,
+    getPhaseStyles,
+    playBeep,
+    sendNewTest,
+    sendPhaseSync,
+    TestPhase,
+    TestPhaseEvent,
+    TestType,
+} from "./test-commons.ts";
 import {Scale} from "../components/Scale.tsx";
 import {config} from "../config.ts";
 
 
-export default function CriticalForceTestSustain(): React.JSX.Element {
+function CriticalForceTestSustain({resetTest}: {
+    resetTest?: () => void
+}): React.JSX.Element {
     const resetWeightRef = useRef<() => void>(null);
     const navigate = useNavigate();
 
@@ -23,8 +34,16 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
     const lastTriggeredSecondRef = useRef<number>(-1);
 
 
-    const startTestSequence = () => {
+    function startTestSequence(e: React.SubmitEvent<HTMLFormElement>) {
+        e.preventDefault();
+        // const form = e.target;
+        // const formData = new FormData(form);
+        // const arm = formData.get("arm");
+        // console.log("Arm: " + arm);
+        // return
+
         currentTestIdRef.current = generateTestId('TEST_CF_S_');
+        sendNewTest(currentTestIdRef.current, TestType.CRITICAL_FORCE_SUSTAINED)
         sendPhaseSync(TestPhaseEvent.TEST_START, currentTestIdRef.current);
 
         const now = performance.now();
@@ -103,12 +122,15 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
     const uiTheme = getPhaseStyles(phase);
 
     return (
-        <div className="bg-dark text-light min-vh-screen d-flex flex-column align-items-center justify-content-center p-3">
-            <button onClick={() => navigate("/")} className="btn btn-outline-secondary btn-sm mb-4 position-absolute top-0 start-0 m-3">
+        <div
+            className="bg-dark text-light min-vh-screen d-flex flex-column align-items-center justify-content-center p-3">
+            <button onClick={() => navigate("/")}
+                    className="btn btn-outline-secondary btn-sm mb-4 position-absolute top-0 start-0 m-3">
                 ← Back to Scale Dashboard
             </button>
 
-            <div className={`card shadow-lg p-4 w-100 ${uiTheme.bg}`} style={{ maxWidth: '450px', borderRadius: '1rem', transition: 'all 0.3s ease' }}>
+            <div className={`card shadow-lg p-4 w-100 ${uiTheme.bg}`}
+                 style={{maxWidth: '450px', borderRadius: '1rem', transition: 'all 0.3s ease'}}>
                 <div className="text-center mb-3">
                     <h1 className="fw-bold text-light">Critical Force Test</h1>
                     <h2 className="text-light-emphasis">Sustained pull</h2>
@@ -125,7 +147,7 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
                     </div>
                 )}
 
-                {phase === 'finished' && (
+                {phase === 'finished' ? (
                     <div className="card bg-dark border-secondary p-4 w-100"
                          style={{maxWidth: '450px', borderRadius: '1rem'}}>
                         <div className="row g-2 mb-2">
@@ -136,25 +158,44 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
                                 View Test Results
                             </button>
                             <button
-                                onClick={startTestSequence}
+                                onClick={resetTest}
                                 className="btn btn-light fw-bold px-4 py-2 w-100 shadow-sm border-0"
                             >
                                 Restart the test
                             </button>
                         </div>
                     </div>
-                )}
-
-                {phase != 'finished' && (
+                ) : (
                     <>
                         <Scale displayMaxWeight={false} resetWeightRef={resetWeightRef}/>
-                        <div className="d-grid gap-2">
+                        <div className="card bg-black p-4 d-grid gap-2">
                             {phase === 'idle' ? (
-                                <button onClick={startTestSequence} className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
-                                    Begin Test
-                                </button>
+                                <form onSubmit={startTestSequence} className="d-grid gap-3">
+                                    {/*<div className="mx-auto">*/}
+                                    {/*<div className="input-group">*/}
+                                    {/*    <input type="radio" className="btn-check" name="arm" id="option1"*/}
+                                    {/*           autoComplete="off" value="left"/>*/}
+                                    {/*    <label className="btn btn-outline-light" style={{borderTopLeftRadius: "0.375em", borderBottomLeftRadius: "0.375em"}} htmlFor="option1">Left arm</label>*/}
+
+                                    {/*    <input type="radio" className="btn-check" name="arm" id="option2"*/}
+
+                                    {/*           autoComplete="off"  value="right"/>*/}
+                                    {/*    <label className="btn btn-outline-light" htmlFor="option2">Right arm</label>*/}
+
+                                    {/*    <input type="radio" className="btn-check" name="arm" id="option3"*/}
+                                    {/*           autoComplete="off"  value="both"/>*/}
+                                    {/*    <label className="btn btn-outline-light" htmlFor="option3">Both arms</label>*/}
+                                    {/*</div>*/}
+                                    {/*</div>*/}
+
+                                    <button type="submit"
+                                            className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
+                                        Begin Test
+                                    </button>
+                                </form>
                             ) : (
-                                <button onClick={cancelTestSequence} className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">
+                                <button onClick={cancelTestSequence}
+                                        className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">
                                     Abort Test
                                 </button>
                             )}
@@ -164,4 +205,15 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
             </div>
         </div>
     );
+}
+
+
+export default function CriticalForceTestSustainRoute(): React.JSX.Element {
+    const [key, setKey] = useState<number>(0)
+
+    function resetTest() {
+        setKey(oldKey => oldKey + 1)
+    }
+
+    return <CriticalForceTestSustain key={key} resetTest={resetTest}/>
 }

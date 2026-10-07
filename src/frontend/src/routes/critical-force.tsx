@@ -1,11 +1,20 @@
 import React, {useRef, useState} from 'react';
 import {useNavigate} from 'react-router';
 import "../../styles/common.scss"
-import {generateTestId, getPhaseStyles, playBeep, sendPhaseSync, TestPhase, TestPhaseEvent,} from "./test-commons.ts";
+import {
+    generateTestId,
+    getPhaseStyles,
+    playBeep, sendNewTest,
+    sendPhaseSync,
+    TestPhase,
+    TestPhaseEvent,
+    TestType,
+} from "./test-commons.ts";
 import {Scale} from "../components/Scale.tsx";
 import {config} from "../config.ts";
 
-export default function CriticalForceTest(): React.JSX.Element {
+
+function CriticalForceTestRepeaters({resetTest}: { resetTest: () => void }): React.JSX.Element {
     const resetWeightRef = useRef<() => void>(null);
     const navigate = useNavigate();
 
@@ -28,7 +37,8 @@ export default function CriticalForceTest(): React.JSX.Element {
 
     const startTestSequence = () => {
         currentTestIdRef.current = generateTestId('TEST_CF_R_');
-        sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
+        sendNewTest(currentTestIdRef.current, TestType.CRITICAL_FORCE_REPEATERS)
+        sendPhaseSync(TestPhaseEvent.TEST_START, currentTestIdRef.current);
 
         const now = performance.now();
         phaseRef.current = TestPhase.countdown;
@@ -130,12 +140,15 @@ export default function CriticalForceTest(): React.JSX.Element {
     const uiTheme = getPhaseStyles(phase);
 
     return (
-        <div className="bg-dark text-light min-vh-screen d-flex flex-column align-items-center justify-content-center p-3">
-            <button onClick={() => navigate("/")} className="btn btn-outline-secondary btn-sm mb-4 position-absolute top-0 start-0 m-3">
+        <div
+            className="bg-dark text-light min-vh-screen d-flex flex-column align-items-center justify-content-center p-3">
+            <button onClick={() => navigate("/")}
+                    className="btn btn-outline-secondary btn-sm mb-4 position-absolute top-0 start-0 m-3">
                 ← Back to Scale Dashboard
             </button>
 
-            <div className={`card shadow-lg p-4 w-100 ${uiTheme.bg}`} style={{ maxWidth: '450px', borderRadius: '1rem', transition: 'all 0.3s ease' }}>
+            <div className={`card shadow-lg p-4 w-100 ${uiTheme.bg}`}
+                 style={{maxWidth: '450px', borderRadius: '1rem', transition: 'all 0.3s ease'}}>
                 <div className="text-center mb-3">
                     <h1 className="fw-bold text-light">Critical Force Test</h1>
                     <h2 className="text-light-emphasis">7:3 Repeaters</h2>
@@ -145,7 +158,8 @@ export default function CriticalForceTest(): React.JSX.Element {
                     <div className="text-center mb-3">
                         <h1 className="h4 fw-bold mb-1">{uiTheme.title}</h1>
                         {phase !== 'finished' && (
-                            <span className="badge bg-black px-3 py-2 font-monospace fs-6">Set {currentSet} / {TOTAL_SETS}</span>
+                            <span
+                                className="badge bg-black px-3 py-2 font-monospace fs-6">Set {currentSet} / {TOTAL_SETS}</span>
                         )}
                     </div>
                 )}
@@ -167,7 +181,7 @@ export default function CriticalForceTest(): React.JSX.Element {
                                 View Test Results
                             </button>
                             <button
-                                onClick={startTestSequence}
+                                onClick={resetTest}
                                 className="btn btn-light fw-bold px-4 py-2 w-100 shadow-sm border-0"
                             >
                                 Restart the test
@@ -176,14 +190,15 @@ export default function CriticalForceTest(): React.JSX.Element {
                     </div>
                 ) : (<>
                         <Scale displayMaxWeight={false} resetWeightRef={resetWeightRef}/>
-
                         <div className="d-grid gap-2">
                             {phase === 'idle' ? (
-                                <button onClick={startTestSequence} className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
+                                <button onClick={startTestSequence}
+                                        className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
                                     Begin Test
                                 </button>
                             ) : (
-                                <button onClick={cancelTestSequence} className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">
+                                <button onClick={cancelTestSequence}
+                                        className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">
                                     Abort Test
                                 </button>
                             )}
@@ -193,4 +208,15 @@ export default function CriticalForceTest(): React.JSX.Element {
             </div>
         </div>
     );
+}
+
+
+export default function CriticalForceTestRepeatersRoute(): React.JSX.Element {
+    const [key, setKey] = useState<number>(0)
+
+    function resetTest() {
+        setKey(oldKey => oldKey + 1)
+    }
+
+    return <CriticalForceTestRepeaters key={key} resetTest={resetTest}/>
 }

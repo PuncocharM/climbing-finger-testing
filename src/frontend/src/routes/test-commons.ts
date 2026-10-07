@@ -17,6 +17,11 @@ export enum TestPhaseEvent {
     TEST_ABORT = "TEST_ABORT",
 }
 
+export enum TestType {
+    CRITICAL_FORCE_SUSTAINED = "CRITICAL_FORCE_SUSTAINED",
+    CRITICAL_FORCE_REPEATERS = "CRITICAL_FORCE_REPEATERS",
+}
+
 export function generateTestId(prefix: string): string {
     const now = new Date();
     return `${prefix}${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -45,18 +50,33 @@ export function playBeep(frequency: number, durationMs: number) {
 }
 
 
+export function sendNewTest(test_id: string | null, test_type: TestType) {
+    const timestamp = new Date().toISOString();
+    axios.post(
+        config.apiEndpoint + "/test/new",
+        JSON.stringify({
+            timestamp: timestamp,
+            test_id: test_id,
+            test_type: test_type,
+        }),
+        {
+            headers: {"Content-Type": "application/json"},
+        })
+        .catch(e => console.error("Error creating new test: " + e));
+}
+
 export function sendPhaseSync (event: TestPhaseEvent, test_id: string | null) {
     if (test_id === null) {
         console.error("Test id is null");
         return;
     }
 
-    const syncTimestamp = new Date().toISOString();
+    const timestamp = new Date().toISOString();
     axios.post(
-        config.apiEndpoint + "/test/sync",
+        config.apiEndpoint + "/test/event",
         JSON.stringify({
             test_id: test_id,
-            timestamp: syncTimestamp,
+            timestamp: timestamp,
             event_type: event
         }),
         {

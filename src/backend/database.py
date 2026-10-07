@@ -1,13 +1,13 @@
 # app/database.py
 import sqlite3
 
-from config import DB_FILE
+from config import Config
 
 
 def init_db():
     """Creates the historical database tables if they do not exist."""
-    DB_FILE.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_FILE)
+    Config.DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(Config.DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
                    CREATE TABLE IF NOT EXISTS test_results (
@@ -25,7 +25,7 @@ def init_db():
 
 
 def get_all_tests():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(Config.DB_FILE)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT test_id, timestamp, test_type, critical_force_kg, w_prime_joules, r_squared FROM test_results ORDER BY timestamp DESC")
@@ -34,7 +34,7 @@ def get_all_tests():
     return [dict(r) for r in rows]
 
 def get_test_by_id(test_id):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(Config.DB_FILE)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM test_results WHERE test_id = ?", (test_id,))
@@ -44,7 +44,7 @@ def get_test_by_id(test_id):
 
 def delete_test_by_id(test_id: str) -> bool:
     """Removes a test entry from the local SQLite database table."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(Config.DB_FILE)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM test_results WHERE test_id = ?", (test_id,))
     changes = conn.total_changes

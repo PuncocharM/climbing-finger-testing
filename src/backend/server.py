@@ -15,7 +15,7 @@ import json
 import csv
 from pydantic import BaseModel
 
-from config import SERIAL_PORT, BAUD_RATE, DEFAULT_PORT, BROADCAST_FREQUENCY, LOG_FILE_DATA, LOG_FILE_EVENTS, LOG_BUFFER_SIZE
+from config import Config
 from data_analysis import process_test_analytics
 from database import init_db, get_all_tests, get_test_by_id, delete_test_by_id
 
@@ -99,7 +99,7 @@ def serial_reader_worker():
         try:
             if esp32.get_ser() is None or not esp32.get_ser().is_open:
                 esp32.set_connection_status(ConnectionStatus.CONNECTING)
-                esp32.set_ser(serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1))
+                esp32.set_ser(serial.Serial(Config.SERIAL_PORT, Config.BAUD_RATE, timeout=1))
                 time.sleep(2)
                 continue
             elif esp32.get_connection_status() != ConnectionStatus.CONNECTED:
@@ -114,8 +114,8 @@ def serial_reader_worker():
                         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                         buffer.append([timestamp, current_weight, esp32.get_connection_status()])
 
-                        if len(buffer) >= LOG_BUFFER_SIZE:
-                            with open(LOG_FILE_DATA, "a", newline="") as f:
+                        if len(buffer) >= Config.LOG_BUFFER_SIZE:
+                            with open(Config.LOG_FILE_DATA, "a", newline="") as f:
                                 writer = csv.writer(f)
                                 writer.writerows(buffer)
                             buffer.clear()
@@ -166,7 +166,7 @@ async def broadcast_data_stream():
                 *[client.send_text(message) for client in connected_clients],
                 return_exceptions=True
             )
-        await asyncio.sleep(BROADCAST_FREQUENCY)
+        await asyncio.sleep(Config.BROADCAST_FREQUENCY)
 
 
 
@@ -194,10 +194,28 @@ async def websocket_endpoint(websocket: WebSocket):
         log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
 
 
-@app.get("/api/weight")
-def get_weight():
-    """Returns the latest read weight and current connection status."""
-    return {"weight": esp32.get_current_weight(), "connection_status": esp32.get_connection_status()}
+class NewTestRequest(BaseModel):
+    timestamp: str
+    test_id: str
+    test_type: str
+
+@app.post("/api/test/new")
+def create_new_test(new_test_request: NewTestRequest):
+    try:
+        log_row = [
+            new_test_request.timestamp,
+            new_test_request.test_id,
+            new_test_request.test_type,
+        ]
+
+        with open(Config.LOG_FILE_TESTS, "a", newline="") as f:
+            csv.writer(f).writerow(log_row)
+
+
+        log.info(f"[{new_test_request.timestamp}] Recorded new test: {new_test_request.test_id}")
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record event marker: {str(e)}")
 
 
 class TestEvent(BaseModel):
@@ -205,18 +223,22 @@ class TestEvent(BaseModel):
     timestamp: str
     event_type: str
 
-@app.post("/api/test/sync")
-async def log_phase_marker(test_event: TestEvent, background_tasks: BackgroundTasks):
+@app.post("/api/test/event")
+async def log_test_event(test_event: TestEvent, background_tasks: BackgroundTasks):
     try:
-        log_row = [test_event.timestamp, f"{test_event.event_type}", esp32.get_connection_status(), test_event.test_id]
+        log_row = [
+            test_event.timestamp,
+            test_event.test_id,
+            test_event.event_type,
+        ]
 
-        with open(LOG_FILE_EVENTS, "a", newline="") as f:
+        with open(Config.LOG_FILE_EVENTS, "a", newline="") as f:
             csv.writer(f).writerow(log_row)
 
         if test_event.event_type == "TEST_END":
             background_tasks.add_task(process_test_analytics, test_event.test_id)
 
-        print(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
+        log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to record event marker: {str(e)}")
@@ -236,8 +258,8 @@ def fetch_single_test_details(test_id: str):
 
     try:
         # 2. Open our dual logs
-        df_data = pd.read_csv(LOG_FILE_DATA, names=["timestamp", "weight", "status"])
-        df_events = pd.read_csv(LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])
+        df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])
+        df_events = pd.read_csv(Config.LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])
 
         df_events['timestamp'] = pd.to_datetime(df_events['timestamp'])
         df_data['timestamp'] = pd.to_datetime(df_data['timestamp'])
@@ -343,7 +365,7 @@ if __name__ == "__main__":
             print('Error: port has to be an integer')
             exit(1)
     else:
-        port = DEFAULT_PORT
+        port = Config.DEFAULT_PORT
 
 
     uvicorn.run(app, host="0.0.0.0", port=port)
