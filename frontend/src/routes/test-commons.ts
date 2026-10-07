@@ -1,6 +1,20 @@
 import axios from "axios";
 
-export type TestPhase = 'idle' | 'countdown' | 'pull' | 'rest' | 'finished';
+export enum TestPhase {
+    idle = "idle",
+    countdown = "countdown",
+    pull = "pull",
+    rest = "rest",
+    finished = "finished",
+}
+
+export enum TestPhaseEvent {
+    TEST_START = "TEST_START",
+    PULL_START = "PULL_START",
+    REST_START = "REST_START",
+    TEST_END = "TEST_END",
+    TEST_ABORT = "TEST_ABORT",
+}
 
 export function generateTestId(prefix: string): string {
     const now = new Date();
@@ -30,14 +44,19 @@ export function playBeep(frequency: number, durationMs: number) {
 }
 
 
-export function sendPhaseSync (markerType: 'TEST_START' | 'PULL_START' | 'REST_START' | 'TEST_END' | 'TEST_ABORT', test_id: string) {
+export function sendPhaseSync (event: TestPhaseEvent, test_id: string | null) {
+    if (test_id === null) {
+        console.error("Test id is null");
+        return;
+    }
+
     const syncTimestamp = new Date().toISOString();
     axios.post(
         "http://localhost:8000/api/test/sync",
         JSON.stringify({
             test_id: test_id,
             timestamp: syncTimestamp,
-            event_type: markerType
+            event_type: event
         }),
         {
             headers: {"Content-Type": "application/json"},
@@ -48,11 +67,11 @@ export function sendPhaseSync (markerType: 'TEST_START' | 'PULL_START' | 'REST_S
 
 export function getPhaseStyles (phase: TestPhase) {
     switch (phase) {
-        case 'countdown': return { bg: 'bg-warning text-dark', title: 'GET READY' };
-        case 'pull': return { bg: 'bg-danger text-white animate-pulse', title: 'PULL HARD!' };
-        case 'rest': return { bg: 'bg-primary text-white', title: 'REST' };
-        case 'finished': return { bg: 'bg-success text-white', title: 'TEST COMPLETE' };
-        case 'idle': default: return { bg: 'bg-dark border-secondary', title: 'CRITICAL FORCE TEST' };
+        case TestPhase.countdown: return { bg: 'bg-warning text-dark', title: 'GET READY' };
+        case TestPhase.pull: return { bg: 'bg-danger text-white animate-pulse', title: 'PULL HARD!' };
+        case TestPhase.rest: return { bg: 'bg-primary text-white', title: 'REST' };
+        case TestPhase.finished: return { bg: 'bg-success text-white', title: 'TEST COMPLETE' };
+        case TestPhase.idle: default: return { bg: 'bg-dark border-secondary', title: 'CRITICAL FORCE TEST' };
     }
 }
 

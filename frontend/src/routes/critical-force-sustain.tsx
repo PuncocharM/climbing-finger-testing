@@ -1,50 +1,44 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import React, {useRef, useState} from 'react';
+import {useNavigate} from 'react-router';
 import "../../styles/common.scss"
-import {
-    generateTestId,
-    getPhaseStyles,
-    playBeep,
-    sendPhaseSync,
-    type TestPhase,
-} from "./test-commons.ts";
+import {generateTestId, getPhaseStyles, playBeep, sendPhaseSync, TestPhase, TestPhaseEvent,} from "./test-commons.ts";
 import {Scale} from "../components/Scale.tsx";
-
+import {config} from "../config.ts";
 
 
 export default function CriticalForceTestSustain(): React.JSX.Element {
     const resetWeightRef = useRef<() => void>(null);
     const navigate = useNavigate();
 
-    const PULL_DURATION = 60;
+    const PULL_DURATION = config.CRITICAL_FORCE_SUSTAIN_DURATION;
 
 
-    const [phase, setPhase] = useState<TestPhase>('idle');
+    const [phase, setPhase] = useState<TestPhase>(TestPhase.idle);
     const [timeLeft, setTimeLeft] = useState<number>(0);
 
-    const currentTestIdRef = useRef<string>("NONE");
+    const currentTestIdRef = useRef<string | null>(null);
     const timerRef = useRef<number | null>(null);
-    const phaseRef = useRef<TestPhase>('idle'); // Kept in sync with state for accurate interval scoping
+    const phaseRef = useRef<TestPhase>(TestPhase.idle); // Kept in sync with state for accurate interval scoping
     const phaseEndTimeRef = useRef<number>(0);
     const lastTriggeredSecondRef = useRef<number>(-1);
 
 
     const startTestSequence = () => {
         currentTestIdRef.current = generateTestId('TEST_CF_S_');
-        sendPhaseSync('TEST_START', currentTestIdRef.current);
+        sendPhaseSync(TestPhaseEvent.TEST_START, currentTestIdRef.current);
 
         const now = performance.now();
-        phaseRef.current = 'countdown';
-        setPhase('countdown');
-        setTimeLeft(10);
+        phaseRef.current = TestPhase.countdown;
+        setPhase(TestPhase.countdown);
+        setTimeLeft(config.COUNTDOWN);
 
-        phaseEndTimeRef.current = now + 10000;
-        lastTriggeredSecondRef.current = 10;
+        phaseEndTimeRef.current = now + config.COUNTDOWN * 1000;
+        lastTriggeredSecondRef.current = config.COUNTDOWN;
 
         playBeep(600, 200);
 
         if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = window.setInterval(checkTimer, 50);
+        timerRef.current = window.setInterval(checkTimer, config.TIMER_REFRESH_RATE);
     };
 
 
@@ -58,47 +52,51 @@ export default function CriticalForceTestSustain(): React.JSX.Element {
             setTimeLeft(secondsRemaining);
 
             if (secondsRemaining <= 3 && secondsRemaining > 0) {
-                if (phaseRef.current === 'countdown') {
+                if (phaseRef.current === TestPhase.countdown) {
                     playBeep(440, 150);
                 }
             }
         }
 
         if (msRemaining <= 0) {
-            if (phaseRef.current === 'countdown') {
-                playBeep(880, 500);
-                phaseRef.current = 'pull';
-                setPhase('pull');
+            switch (phaseRef.current) {
+                case TestPhase.countdown:
+                    playBeep(880, 500);
+                    phaseRef.current = TestPhase.pull;
+                    setPhase(TestPhase.pull);
 
-                sendPhaseSync('PULL_START', currentTestIdRef.current);
+                    sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
-                phaseEndTimeRef.current += PULL_DURATION * 1000;
-                lastTriggeredSecondRef.current = PULL_DURATION;
-                setTimeLeft(PULL_DURATION);
-            }
-            else if (phaseRef.current === 'pull') {
-                playBeep(1200, 1000);
-                phaseRef.current = 'finished';
-                setPhase('finished');
-                sendPhaseSync('TEST_END', currentTestIdRef.current);
+                    phaseEndTimeRef.current += PULL_DURATION * 1000;
+                    lastTriggeredSecondRef.current = PULL_DURATION;
+                    setTimeLeft(PULL_DURATION);
+                    break
+                case TestPhase.pull:
+                    playBeep(1200, 1000);
+                    phaseRef.current = TestPhase.finished;
+                    setPhase(TestPhase.finished);
+                    sendPhaseSync(TestPhaseEvent.TEST_END, currentTestIdRef.current);
 
-                if (timerRef.current) {
-                    clearInterval(timerRef.current);
-                    timerRef.current = null;
-                }
+                    if (timerRef.current) {
+                        clearInterval(timerRef.current);
+                        timerRef.current = null;
+                    }
+                    break;
+                default:
+                    console.error("Unrecognized phase:", phaseRef.current);
             }
         }
     };
 
     const cancelTestSequence = () => {
-        sendPhaseSync('TEST_ABORT', currentTestIdRef.current);
+        sendPhaseSync(TestPhaseEvent.TEST_ABORT, currentTestIdRef.current);
 
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
-        phaseRef.current = 'idle';
-        setPhase('idle');
+        phaseRef.current = TestPhase.idle;
+        setPhase(TestPhase.idle);
         setTimeLeft(0);
     };
 

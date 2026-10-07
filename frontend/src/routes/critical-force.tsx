@@ -1,31 +1,26 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import React, {useRef, useState} from 'react';
+import {useNavigate} from 'react-router';
 import "../../styles/common.scss"
-import {
-    generateTestId,
-    getPhaseStyles,
-    playBeep,
-    sendPhaseSync,
-    type TestPhase,
-} from "./test-commons.ts";
+import {generateTestId, getPhaseStyles, playBeep, sendPhaseSync, TestPhase, TestPhaseEvent,} from "./test-commons.ts";
 import {Scale} from "../components/Scale.tsx";
+import {config} from "../config.ts";
 
 export default function CriticalForceTest(): React.JSX.Element {
     const resetWeightRef = useRef<() => void>(null);
     const navigate = useNavigate();
 
-    const PULL_DURATION = 7;
-    const REST_DURATION = 3;
-    const TOTAL_SETS = 24; // 4 Minutes standard critical force test
+    const PULL_DURATION = config.REPEATER_PULL;
+    const REST_DURATION = config.REPEATER_REST;
+    const TOTAL_SETS = config.REPEATERS_SETS;
 
-    const [phase, setPhase] = useState<TestPhase>('idle');
+    const [phase, setPhase] = useState<TestPhase>(TestPhase.idle);
     const [currentSet, setCurrentSet] = useState<number>(1);
     const [timeLeft, setTimeLeft] = useState<number>(0);
 
 
-    const currentTestIdRef = useRef<string>("NONE");
+    const currentTestIdRef = useRef<string | null>(null);
     const timerRef = useRef<number | null>(null);
-    const phaseRef = useRef<TestPhase>('idle'); // Kept in sync with state for accurate interval scoping
+    const phaseRef = useRef<TestPhase>(TestPhase.idle); // Kept in sync with state for accurate interval scoping
     const currentSetRef = useRef<number>(1); // Kept in sync with state for accurate interval scoping
     const phaseEndTimeRef = useRef<number>(0);
     const lastTriggeredSecondRef = useRef<number>(-1);
@@ -33,17 +28,17 @@ export default function CriticalForceTest(): React.JSX.Element {
 
     const startTestSequence = () => {
         currentTestIdRef.current = generateTestId('TEST_CF_R_');
-        sendPhaseSync('TEST_START', currentTestIdRef.current);
+        sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
         const now = performance.now();
-        phaseRef.current = 'countdown';
-        setPhase('countdown');
+        phaseRef.current = TestPhase.countdown;
+        setPhase(TestPhase.countdown);
         setCurrentSet(1);
         currentSetRef.current = 1
-        setTimeLeft(10);
 
-        phaseEndTimeRef.current = now + 10000;
-        lastTriggeredSecondRef.current = 10;
+        setTimeLeft(config.COUNTDOWN);
+        phaseEndTimeRef.current = now + config.COUNTDOWN * 1000;
+        lastTriggeredSecondRef.current = config.COUNTDOWN;
 
         playBeep(600, 200);
 
@@ -68,63 +63,67 @@ export default function CriticalForceTest(): React.JSX.Element {
         }
 
         if (msRemaining <= 0) {
-            if (phaseRef.current === 'countdown') {
-                playBeep(880, 500);
-                phaseRef.current = 'pull';
-                setPhase('pull');
+            switch (phaseRef.current) {
+                case TestPhase.countdown:
+                    playBeep(880, 500);
+                    phaseRef.current = TestPhase.pull;
+                    setPhase(TestPhase.pull);
 
-                sendPhaseSync('PULL_START', currentTestIdRef.current);
+                    sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
-                phaseEndTimeRef.current += PULL_DURATION * 1000;
-                lastTriggeredSecondRef.current = PULL_DURATION;
-                setTimeLeft(PULL_DURATION);
-            }
-            else if (phaseRef.current === 'pull') {
-                if (currentSetRef.current >= TOTAL_SETS) {
-                    playBeep(1200, 1000);
-                    phaseRef.current = 'finished';
-                    setPhase('finished');
-                    sendPhaseSync('TEST_END', currentTestIdRef.current);
+                    phaseEndTimeRef.current += PULL_DURATION * 1000;
+                    lastTriggeredSecondRef.current = PULL_DURATION;
+                    setTimeLeft(PULL_DURATION);
+                    break;
+                case TestPhase.pull:
+                    if (currentSetRef.current >= TOTAL_SETS) {
+                        playBeep(1200, 1000);
+                        phaseRef.current = TestPhase.finished;
+                        setPhase(TestPhase.finished);
+                        sendPhaseSync(TestPhaseEvent.TEST_END, currentTestIdRef.current);
 
-                    if (timerRef.current) {
-                        clearInterval(timerRef.current);
-                        timerRef.current = null;
+                        if (timerRef.current) {
+                            clearInterval(timerRef.current);
+                            timerRef.current = null;
+                        }
+                    } else {
+                        playBeep(550, 400);
+                        phaseRef.current = TestPhase.rest;
+                        setPhase(TestPhase.rest);
+                        sendPhaseSync(TestPhaseEvent.REST_START, currentTestIdRef.current);
+
+                        phaseEndTimeRef.current += REST_DURATION * 1000;
+                        lastTriggeredSecondRef.current = REST_DURATION;
+                        setTimeLeft(REST_DURATION);
                     }
-                } else {
-                    playBeep(550, 400);
-                    phaseRef.current = 'rest';
-                    setPhase('rest');
-                    sendPhaseSync('REST_START', currentTestIdRef.current);
+                    break;
+                case TestPhase.rest:
+                    playBeep(880, 500);
+                    phaseRef.current = TestPhase.pull;
+                    setPhase(TestPhase.pull);
+                    sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
-                    phaseEndTimeRef.current += REST_DURATION * 1000;
-                    lastTriggeredSecondRef.current = REST_DURATION;
-                    setTimeLeft(REST_DURATION);
-                }
-            }
-            else if (phaseRef.current === 'rest') {
-                playBeep(880, 500);
-                phaseRef.current = 'pull';
-                setPhase('pull');
-                sendPhaseSync('PULL_START', currentTestIdRef.current);
-
-                phaseEndTimeRef.current += PULL_DURATION * 1000;
-                lastTriggeredSecondRef.current = PULL_DURATION;
-                setTimeLeft(PULL_DURATION);
-                currentSetRef.current += 1;
-                setCurrentSet(currentSetRef.current);
+                    phaseEndTimeRef.current += PULL_DURATION * 1000;
+                    lastTriggeredSecondRef.current = PULL_DURATION;
+                    setTimeLeft(PULL_DURATION);
+                    currentSetRef.current += 1;
+                    setCurrentSet(currentSetRef.current);
+                    break;
+                default:
+                    console.error("Unrecognized phase:", phaseRef.current);
             }
         }
     };
 
     const cancelTestSequence = () => {
-        sendPhaseSync('TEST_ABORT', currentTestIdRef.current);
+        sendPhaseSync(TestPhaseEvent.TEST_ABORT, currentTestIdRef.current);
 
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
-        phaseRef.current = 'idle';
-        setPhase('idle');
+        phaseRef.current = TestPhase.idle;
+        setPhase(TestPhase.idle);
         setTimeLeft(0);
     };
 

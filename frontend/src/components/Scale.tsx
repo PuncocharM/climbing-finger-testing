@@ -36,7 +36,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
 
         ws.onclose = () => {
             setConnectionStatus('disconnected');
-            window.setTimeout(connect, 1000);
+            window.setTimeout(connect, config.SERVER_RECONNECT_TIMEOUT);
         };
 
         return ws;
@@ -72,12 +72,12 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
         <div className="bg-black border border-dark rounded-3 p-4 text-center mb-4 shadow-inner">
             <div className="row">
                 <div className={displayMaxWeight ? "col-6 border-end border-dark" : "col-12"}>
-                  <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight</span>
+                  <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
                     <div className="h2 font-monospace fw-bold text-success my-2">{weight.toFixed(2)}</div>
                 </div>
                 {displayMaxWeight && (
                     <div className="col-6">
-                        <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Max Weight</span>
+                        <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Max Weight [kg]</span>
                         <div className="h2 font-monospace fw-bold text-warning my-2">{maxWeight.toFixed(2)}</div>
                     </div>
                 )}
@@ -95,6 +95,4 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
             </div>
         </div>
     )
-
-    // return {'weight': weight, 'maxWeight': maxWeight, 'espStatus': espStatus, 'connectionStatus': connectionStatus, 'resetMaxWeight': resetMaxWeight};
 }
