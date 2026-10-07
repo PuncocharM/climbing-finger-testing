@@ -44,14 +44,14 @@ app.add_middleware(
 )
 
 class ConnectionStatus(StrEnum):
-    ERROR = "ERROR"
-    CONNECTING = "CONNECTING"
-    CONNECTED = "CONNECTED"
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
 
 class ESP32:
-    _connection_status: ConnectionStatus
+    _connection_status: ConnectionStatus = ConnectionStatus.DISCONNECTED
     _status: str
-    _latest_weight: float
+    _latest_weight: float | None= None
     _ser: serial.Serial | None = None
 
     def set_connection_status(self, connection_status: ConnectionStatus):
@@ -68,14 +68,14 @@ class ESP32:
     def get_status(self):
         return self._status
 
-    def set_latest_weight(self, latest_weight: float):
+    def set_latest_weight(self, latest_weight: float | None):
         log.debug(f"Registered weight: {latest_weight}")
         self._latest_weight = latest_weight
 
     def get_latest_weight(self):
         return self._latest_weight
 
-    def set_ser(self, ser: serial.Serial):
+    def set_ser(self, ser: serial.Serial | None):
         self._ser = ser
 
     def get_ser(self):
@@ -139,7 +139,9 @@ def serial_reader_worker():
 
         except serial.SerialException as e:
             log.error(f"ESP32 connection error: {e}")
-            esp32.set_connection_status(ConnectionStatus.ERROR)
+            esp32.set_connection_status(ConnectionStatus.DISCONNECTED)
+            esp32.set_latest_weight(None)
+            esp32.set_ser(None)
             time.sleep(3)
 
 
@@ -148,7 +150,7 @@ async def broadcast_data_stream():
     time.sleep(1)
 
     while True:
-        if connected_clients and esp32.get_connection_status() == ConnectionStatus.CONNECTED:
+        if connected_clients:
             payload = {
                 "weight": esp32.get_latest_weight(),
                 "status": esp32.get_connection_status()
@@ -194,9 +196,6 @@ def get_weight():
 
 @app.post("/api/test/sync")
 async def log_phase_marker(frontend_event: FrontendEvent, background_tasks: BackgroundTasks):
-    """
-    Injects a runtime phase transition marker into the active CSV logging stream.
-    """
     try:
         log_row = [frontend_event.timestamp, f"{frontend_event.event_type}", esp32.get_connection_status(), frontend_event.test_id]
 
@@ -213,17 +212,11 @@ async def log_phase_marker(frontend_event: FrontendEvent, background_tasks: Back
 
 @app.get("/api/history")
 def fetch_history_index():
-    """Returns a list of all past climbing test metrics recorded."""
     return get_all_tests()
 
-# Replace this endpoint in app.py
 
 @app.get("/api/history/{test_id}")
 def fetch_single_test_details(test_id: str):
-    """
-    Returns the comprehensive summary AND the entire continuous 80Hz data stream
-    sliced between the test's start and end events.
-    """
     # 1. Fetch the baseline metrics summary from SQLite
     result = get_test_by_id(test_id)
     if not result:
@@ -333,7 +326,6 @@ def delete_test(test_id: str):
     return {"status": "deleted", "test_id": test_id}
 
 
-# Run via command line: uvicorn app:app --reload --host 0.0.0.0 --port 8000
 if __name__ == "__main__":
     import uvicorn
 

@@ -4,15 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "package": "bash package.sh",
-    "router-build": "react-router build && bash package.sh",
-    "router-dev": "react-router dev",
-    "router-start": "react-router-serve ./build/server/index.js",
-    "router-typecheck": "react-router typegen && tsc",
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "frontend-package": "bash package.sh",
+    "frontend-build": "react-router build",
+    "frontend-dev": "react-router dev"
   },
   "dependencies": {
     "axios": "^1.20.0",

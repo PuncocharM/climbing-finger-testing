@@ -1,10 +1,14 @@
 import React, {useEffect, useState} from "react";
 import {config} from "../config.ts";
 
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+enum ConnectionStatus {
+    connecting = 'connecting',
+    connected = 'connected',
+    disconnected = 'disconnected',
+}
 
 interface TelemetryData {
-    weight: number;
+    weight: number | null;
     status: string;
 }
 
@@ -12,30 +16,30 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
     displayMaxWeight: boolean,
     resetWeightRef?: React.RefObject<(() => void) | null>
 }) {
-    const [weight, setWeight] = useState<number>(0.0);
-    const [maxWeight, setMaxWeight] = useState<number>(0.0);
+    const [weight, setWeight] = useState<number | null>(null);
+    const [maxWeight, setMaxWeight] = useState<number | null>(null);
     const [espStatus, setEspStatus] = useState<string>('Unknown');
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.disconnected);
 
     function connect() {
-        setConnectionStatus('connecting');
+        setConnectionStatus(ConnectionStatus.connecting);
         const ws = new WebSocket(config.webSocketEndpoint);
 
-        ws.onopen = () => setConnectionStatus('connected');
+        ws.onopen = () => setConnectionStatus(ConnectionStatus.connected);
 
         ws.onmessage = (event: MessageEvent) => {
             try {
                 const data: TelemetryData = JSON.parse(event.data);
                 setWeight(data.weight);
                 setEspStatus(data.status);
-                setMaxWeight((prevMax) => (data.weight > prevMax ? data.weight : prevMax));
+                setMaxWeight((prevMax) => (data.weight != null && (prevMax == null || data.weight > prevMax) ? data.weight : prevMax));
             } catch (error) {
                 console.error('Failed to parse incoming telemetry payload:', error);
             }
         };
 
         ws.onclose = () => {
-            setConnectionStatus('disconnected');
+            setConnectionStatus(ConnectionStatus.disconnected);
             window.setTimeout(connect, config.SERVER_RECONNECT_TIMEOUT);
         };
 
@@ -48,21 +52,30 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
         return () => {
             if (ws) {
                 ws.onclose = null;
-                setConnectionStatus('disconnected');
+                setConnectionStatus(ConnectionStatus.disconnected);
                 ws.close();
             }
         }
     }, [])
 
-    function getBadgeClass() {
+    function getClassServerConnection() {
         switch (connectionStatus) {
-            case 'connected': return 'text-success bg-dark';
-            case 'disconnected': return 'text-danger bg-dark';
-            case 'connecting': default: return 'text-warning bg-dark';
+            case ConnectionStatus.connected: return 'text-success bg-dark';
+            case ConnectionStatus.disconnected: return 'text-danger bg-dark';
+            case ConnectionStatus.connecting: default: return 'text-warning bg-dark';
         }
     }
 
-    function resetMaxWeight() {setMaxWeight(0)}
+    function getClassScaleConnection() {
+        switch (espStatus) {
+            case "connected": return 'text-success bg-dark';
+            case "disconnected": return 'text-danger bg-dark';
+            case "connecting": default: return 'text-warning bg-dark';
+        }
+    }
+
+
+    function resetMaxWeight() {setMaxWeight(null)}
 
     if (resetWeightRef != null) {
         resetWeightRef.current = resetMaxWeight
@@ -73,24 +86,22 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
             <div className="row">
                 <div className={displayMaxWeight ? "col-6 border-end border-dark" : "col-12"}>
                   <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
-                    <div className="h2 font-monospace fw-bold text-success my-2">{weight.toFixed(2)}</div>
+                    <div className="h2 font-monospace fw-bold text-success my-2">{weight ? weight.toFixed(2) : "-"}</div>
                 </div>
                 {displayMaxWeight && (
                     <div className="col-6">
                         <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Max Weight [kg]</span>
-                        <div className="h2 font-monospace fw-bold text-warning my-2">{maxWeight.toFixed(2)}</div>
+                        <div className="h2 font-monospace fw-bold text-warning my-2">{maxWeight ? maxWeight.toFixed(2) : "-"}</div>
                     </div>
                 )}
             </div>
             <hr className="border-secondary my-3"/>
             <div className="row">
                 <div className="col-6">
-                                    <span className={`badge rounded-pill px-3 py-2 ${getBadgeClass()}`}>
-                    {connectionStatus === 'connected' ? 'Server Connected' : connectionStatus === 'disconnected' ? 'Server Disconnected' : 'Connecting...'}
-                </span>
+                    <span className={`badge rounded-pill px-3 py-2 ${getClassServerConnection()}`}>Server {connectionStatus}</span>
                 </div>
                 <div className="col-6">
-                    <span className="badge rounded-pill bg-dark px-3 py-2 text-light fw-normal small d-block">ESP32 Status: <strong className="text-light">{espStatus}</strong></span>
+                    <span className={`badge rounded-pill px-3 py-2 ${getClassScaleConnection()}`}>Scale {espStatus}</span>
                 </div>
             </div>
         </div>
