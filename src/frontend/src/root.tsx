@@ -5,7 +5,7 @@ import {
     Outlet,
 } from "react-router";
 import type { Route } from "./+types/root";
-import React, {StrictMode} from "react";
+import React from "react";
 import RootLayout from "./layouts/RootLayout.tsx";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function Root() {
-    return <StrictMode><Outlet /></StrictMode>
+    return <Outlet />
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

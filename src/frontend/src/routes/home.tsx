@@ -75,16 +75,23 @@ export default function Home(): React.JSX.Element {
             <div className="row g-2 mt-2">
               <div className="col-6">
                 <button
-                    onClick={() => navigate("/critical-force")}
+                    onClick={() => navigate("/test-critical-force-repeaters")}
                     className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
                 >Run Critical Force Test (repeaters)
                 </button>
               </div>
               <div className="col-6">
                 <button
-                    onClick={() => navigate("/critical-force-sustain")}
+                    onClick={() => navigate("/test-critical-force-sustain")}
                     className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
                 >Run Critical Force Test (sustain)
+                </button>
+              </div>
+              <div className="col-6">
+                <button
+                    onClick={() => navigate("/test-peak-force")}
+                    className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
+                >Run Peak Force Test (MVC)
                 </button>
               </div>
               <div className="col-12">

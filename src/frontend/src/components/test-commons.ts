@@ -20,12 +20,14 @@ export enum TestPhaseEvent {
 export enum TestType {
     CRITICAL_FORCE_SUSTAINED = "CRITICAL_FORCE_SUSTAINED",
     CRITICAL_FORCE_REPEATERS = "CRITICAL_FORCE_REPEATERS",
+    PEAK_FORCE = "PEAK_FORCE",
 }
 
 export function generateTestId(prefix: string): string {
     const now = new Date();
     return `${prefix}${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 }
+
 export function playBeep(frequency: number, durationMs: number) {
     try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -37,7 +39,6 @@ export function playBeep(frequency: number, durationMs: number) {
 
         oscillator.type = 'sine';
         oscillator.frequency.value = frequency;
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Low volume
 
         oscillator.start();
         setTimeout(() => {

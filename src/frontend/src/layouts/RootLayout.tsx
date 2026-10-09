@@ -12,11 +12,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Meta />
         </head>
         <body>
-        <div className="app-container">
-            {children}
-        </div>
-        <ScrollRestoration />
-        <Scripts />
+            <div className="app-container">
+                {children}
+            </div>
+            <ScrollRestoration />
+            <Scripts />
         </body>
         </html>
     );

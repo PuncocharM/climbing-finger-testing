@@ -23,11 +23,13 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
     const [espStatus, setEspStatus] = useState<string>('Unknown');
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.disconnected);
 
-    function connect() {
+    const connect = () => {
         setConnectionStatus(ConnectionStatus.connecting);
         const ws = new WebSocket(config.webSocketEndpoint);
 
-        ws.onopen = () => setConnectionStatus(ConnectionStatus.connected);
+        ws.onopen = () => {
+            setConnectionStatus(ConnectionStatus.connected);
+        }
 
         ws.onmessage = (event: MessageEvent) => {
             try {
@@ -60,7 +62,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
         }
     }, [])
 
-    function getClassServerConnection() {
+    const getClassServerConnection = () => {
         switch (connectionStatus) {
             case ConnectionStatus.connected: return 'text-success bg-dark';
             case ConnectionStatus.disconnected: return 'text-danger bg-dark';
@@ -68,7 +70,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
         }
     }
 
-    function getClassScaleConnection() {
+    const getClassScaleConnection = () => {
         switch (espStatus) {
             case "connected": return 'text-success bg-dark';
             case "disconnected": return 'text-danger bg-dark';
@@ -77,7 +79,7 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
     }
 
 
-    function resetMaxWeight() {
+    const resetMaxWeight = () => {
         axios.post(config.apiEndpoint + "/command/reset_max_weight")
             .catch(e => console.error("Error sending reset max weight command: " + e));
     }
