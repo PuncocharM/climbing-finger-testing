@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import json
 import logging
 import sys
 import threading
@@ -7,17 +9,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import StrEnum
 
-import pandas as pd
+import serial
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-import serial
-import json
-import csv
-from pydantic import BaseModel
 
 from config import Config
 from data_analysis import process_test_analytics
-from database import init_db, get_all_tests, get_test_by_id, delete_test_by_id
+from persistence.database import init_db, get_all_test_entries, get_test_entry_by_id, delete_test_entry, save_test_entry, \
+    DuplicateTestEntryError, save_test_event
+from persistence.model import TestEntryEntity, TestEventEntity
+from schemas import TestEntrySchema, TestEventSchema, Commands
 
 
 @asynccontextmanager
@@ -32,8 +33,8 @@ log = logging.getLogger()
 # logger.setLevel(logging.DEBUG)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 app = FastAPI(lifespan=lifespan, title="ESP32 Load Cell Telemetry Server")
-app.frontend('/', directory='static', fallback="index.html")
-init_db()
+app.frontend('/', directory='../../static', fallback="index.html")
+init_db(f"sqlite:///{Config.DB_FILE}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -194,120 +195,121 @@ async def websocket_endpoint(websocket: WebSocket):
         log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
 
 
-class NewTestRequest(BaseModel):
-    timestamp: str
-    test_id: str
-    test_type: str
-    test_arm: str
-
 @app.post("/api/test/new")
-def create_new_test(new_test_request: NewTestRequest):
+def create_new_test(new_test_request: TestEntrySchema):
     try:
-        log_row = [
-            new_test_request.timestamp,
-            new_test_request.test_id,
-            new_test_request.test_type,
-            new_test_request.test_arm,
-        ]
-
-        with open(Config.LOG_FILE_TESTS, "a", newline="") as f:
-            csv.writer(f).writerow(log_row)
-
-
-        log.info(f"[{new_test_request.timestamp}] Recorded new test: {new_test_request.test_id}")
-        return {"status": "success"}
+        te = TestEntryEntity(**new_test_request.model_dump())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to record event marker: {str(e)}")
+        log.error(f"Cannot convert test request to entity: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a test {new_test_request.test_id}")
 
+    try:
+        save_test_entry(te)
+    except DuplicateTestEntryError as e:
+        log.error(f"Cannot save test with already existing test_it {new_test_request.test_id}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a test with already existing id {new_test_request.test_id}")
+    except Exception as e:
+        log.error(f"Cannot save test {new_test_request.test_id}")
+        raise HTTPException(status_code=500, detail=f"Cannot save the test")
 
-class TestEvent(BaseModel):
-    test_id: str
-    timestamp: str
-    event_type: str
+    log.info(f"[{new_test_request.timestamp}] Recorded new test: {new_test_request.test_id}")
+    return {"status": "success"}
+
 
 @app.post("/api/test/event")
-async def log_test_event(test_event: TestEvent, background_tasks: BackgroundTasks):
+async def log_test_event(test_event: TestEventSchema, background_tasks: BackgroundTasks):
     try:
-        log_row = [
-            test_event.timestamp,
-            test_event.test_id,
-            test_event.event_type,
-        ]
-
-        with open(Config.LOG_FILE_EVENTS, "a", newline="") as f:
-            csv.writer(f).writerow(log_row)
-
-        if test_event.event_type == "TEST_END":
-            background_tasks.add_task(process_test_analytics, test_event.test_id)
-
-        log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
-        return {"status": "success"}
+        te = TestEventEntity(**test_event.model_dump())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to record event marker: {str(e)}")
+        log.error(f"Cannot convert test event request to entity: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a test event {test_event}")
+
+    try:
+        save_test_event(te)
+    except Exception as e:
+        log.error(f"Cannot save test event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cannot save the test")
+
+    if test_event.event_type == "TEST_END":
+        background_tasks.add_task(process_test_analytics, test_event.test_id)
+
+    log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
+    return {"status": "success"}
 
 @app.get("/api/history")
 def fetch_history_index():
-    return get_all_tests()
+    return get_all_test_entries()
 
 
-@app.get("/api/history/{test_id}")
+@app.get("/api/history/{test_id}", response_model=TestEntrySchema)
 def fetch_single_test_details(test_id: str):
-    # 1. Fetch the baseline metrics summary from SQLite
-    result = get_test_by_id(test_id)
-    if not result:
+    test_entry_entity = get_test_entry_by_id(test_id)
+    if not test_entry_entity:
         raise HTTPException(status_code=404, detail="Record not found.")
-    result['set_peaks'] = json.loads(result['set_peaks_json'])
 
-    try:
-        # 2. Open our dual logs
-        df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])
-        df_events = pd.read_csv(Config.LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])
+    return test_entry_entity
 
-        df_events['timestamp'] = pd.to_datetime(df_events['timestamp'])
-        df_data['timestamp'] = pd.to_datetime(df_data['timestamp'])
+    # try:
+    #     test_entry_schema = parse_obj_as(TestEntrySchema, test_entry_entity)
+    # except ValidationError as e:
+    #     log.error(f"Cannot convert test entity to response: {str(e)}")
+    #     raise HTTPException(status_code=500, detail=f"Cannot convert test entity to response")
 
-        # 3. Find the exact boundary times for this specific TestID
-        test_events = df_events[df_events['test_id'] == test_id]
-        if test_events.empty:
-            result['raw_timeline'] = []
-            result['raw_forces'] = []
-            result['phase_markers'] = []
-            return result
 
-        start_time = test_events.iloc[0]['timestamp']
-        end_time = test_events.iloc[-1]['timestamp']
+    # return test_entry_schema
 
-        # 4. Slice out ALL high-frequency points inside this window
-        raw_slice = df_data[(df_data['timestamp'] >= start_time) & (df_data['timestamp'] <= end_time)].sort_values('timestamp')
-
-        # 5. Calculate elapsed seconds for the chart X-axis (e.g. 0s, 0.0125s, 0.025s...)
-        if not raw_slice.empty:
-            elapsed_seconds = (raw_slice['timestamp'] - start_time).dt.total_seconds().round(3).tolist()
-            forces = raw_slice['weight'].dropna().tolist()
-        else:
-            elapsed_seconds = []
-            forces = []
-
-        phase_markers = []
-        for _, row in test_events.iterrows():
-            marker_type = row['event']
-            # We care about tracking the offsets for Pull, Rest, and the initial Countdown
-            if marker_type in ['CRITICAL_FORCE_START', 'PULL_START', 'REST_START', 'TEST_END']:
-                offset = (row['timestamp'] - start_time).total_seconds()
-                phase_markers.append({
-                    "offset_seconds": round(offset, 3),
-                    "type": marker_type.replace("_START", "")
-                })
-
-        result['raw_timeline'] = elapsed_seconds  # X-Axis points
-        result['raw_forces'] = forces            # Y-Axis points
-        result['phase_markers'] = phase_markers  # Shading configuration array
-
-        return result
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=f"Failed to compile raw timeseries: {str(e)}")
+    # result['set_peaks'] = json.loads(result['set_peaks_json'])
+    #
+    # try:
+    #     # 2. Open our dual logs
+    #     df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])
+    #     df_events = pd.read_csv(Config.LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])
+    #
+    #     df_events['timestamp'] = pd.to_datetime(df_events['timestamp'])
+    #     df_data['timestamp'] = pd.to_datetime(df_data['timestamp'])
+    #
+    #     # 3. Find the exact boundary times for this specific TestID
+    #     test_events = df_events[df_events['test_id'] == test_id]
+    #     if test_events.empty:
+    #         result['raw_timeline'] = []
+    #         result['raw_forces'] = []
+    #         result['phase_markers'] = []
+    #         return result
+    #
+    #     start_time = test_events.iloc[0]['timestamp']
+    #     end_time = test_events.iloc[-1]['timestamp']
+    #
+    #     # 4. Slice out ALL high-frequency points inside this window
+    #     raw_slice = df_data[(df_data['timestamp'] >= start_time) & (df_data['timestamp'] <= end_time)].sort_values('timestamp')
+    #
+    #     # 5. Calculate elapsed seconds for the chart X-axis (e.g. 0s, 0.0125s, 0.025s...)
+    #     if not raw_slice.empty:
+    #         elapsed_seconds = (raw_slice['timestamp'] - start_time).dt.total_seconds().round(3).tolist()
+    #         forces = raw_slice['weight'].dropna().tolist()
+    #     else:
+    #         elapsed_seconds = []
+    #         forces = []
+    #
+    #     phase_markers = []
+    #     for _, row in test_events.iterrows():
+    #         marker_type = row['event']
+    #         # We care about tracking the offsets for Pull, Rest, and the initial Countdown
+    #         if marker_type in ['CRITICAL_FORCE_START', 'PULL_START', 'REST_START', 'TEST_END']:
+    #             offset = (row['timestamp'] - start_time).total_seconds()
+    #             phase_markers.append({
+    #                 "offset_seconds": round(offset, 3),
+    #                 "type": marker_type.replace("_START", "")
+    #             })
+    #
+    #     result['raw_timeline'] = elapsed_seconds  # X-Axis points
+    #     result['raw_forces'] = forces            # Y-Axis points
+    #     result['phase_markers'] = phase_markers  # Shading configuration array
+    #
+    #     return result
+    #
+    # except Exception as e:
+    #     print(e)
+    #     raise HTTPException(status_code=500, detail=f"Failed to compile raw timeseries: {str(e)}")
 
 
 def _send_command(command: str):
@@ -329,13 +331,6 @@ def calibrate(weight: float):
     return _send_command(f"calibrate {weight}")
 
 
-class Commands(StrEnum):
-    TARE = "tare"
-    START = "start"
-    STOP = "stop"
-    RESET_MAX_WEIGHT = "reset_max_weight"
-
-
 @app.post("/api/command/{cmd}")
 def send_command(cmd: Commands):
     return _send_command(cmd)
@@ -344,14 +339,13 @@ def send_command(cmd: Commands):
 
 @app.delete("/api/history/{test_id}")
 def delete_test(test_id: str):
-    """Deletes a specific test result record from the historical database index."""
-    success = delete_test_by_id(test_id)
+    success = delete_test_entry(test_id)
     if not success:
         raise HTTPException(
             status_code=404,
             detail="The requested evaluation entry could not be found or was already removed."
         )
-    print(f"[{test_id}] Record successfully purged from SQLite cache database.")
+    log.info(f"[{test_id}] Test removed from database.")
     return {"status": "deleted", "test_id": test_id}
 
 

@@ -2,33 +2,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import "../../styles/common.scss"
+import axios from "axios";
+import type {TestSchema} from "../components/test-commons.ts";
+import {config} from "../config.ts";
 
-interface HistoricalTestRecord {
-    test_id: string;
-    timestamp: string;
-    test_type: string;
-    critical_force_kg: number;
-    w_prime_joules: number;
-    r_squared: number;
-}
 
 export default function TestingHistory(): React.JSX.Element {
     const navigate = useNavigate();
 
-    const [tests, setTests] = useState<HistoricalTestRecord[]>([]);
+    const [tests, setTests] = useState<TestSchema[]>([]);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchHistoryData = async () => {
+    const fetchHistoryData = () => {
         try {
-            const response = await fetch("http://localhost:8000/api/history");
-            if (!response.ok) {
-                throw new Error(`Server returned HTTP transport fault: ${response.status}`);
-            }
-            const json: HistoricalTestRecord[] = await response.json();
-            setTests(json);
-            setLoading(false);
+            axios.get<TestSchema[]>(config.apiEndpoint + "/history")
+                .then(r => {
+                    setTests(r.data);
+                    setLoading(false);
+                })
+                .catch((e) => {
+                    throw new Error(`Server returned HTTP transport fault: ${e}`);
+                })
+
         } catch (err: any) {
             setError(err.message || "Failed to establish a connection to the server database index.");
             setLoading(false);
@@ -138,10 +135,9 @@ export default function TestingHistory(): React.JSX.Element {
                                 <thead className="table-light text-uppercase tracking-wider small">
                                 <tr>
                                     <th className="ps-4 py-3">Date & Time</th>
-                                    <th className="py-3">Test Type</th>
-                                    <th className="py-3 text-center">Critical Force</th>
-                                    <th className="py-3 text-center">W' (Battery)</th>
-                                    <th className="py-3 text-center">R² Fit</th>
+                                    <th className="py-3">Test Id</th>
+                                    <th className="py-3 text-center">Test type</th>
+                                    <th className="py-3 text-center">Test arm</th>
                                     <th className="pe-4 py-3 text-end">Actions</th>
                                 </tr>
                                 </thead>
@@ -155,17 +151,14 @@ export default function TestingHistory(): React.JSX.Element {
                                         <td className="ps-4 py-3 fw-semibold font-monospace small text-emerald-400">
                                             {formatDisplayDate(test.timestamp)}
                                         </td>
-                                        <td className="py-3 small text-muted">7:3 Intermittent</td>
                                         <td className="py-3 text-center fw-bold text-warning font-monospace">
-                                            {test.critical_force_kg.toFixed(1)} <span className="small font-sans text-muted">kg</span>
-                                        </td>
-                                        <td className="py-3 text-center fw-bold text-success font-monospace">
-                                            {test.w_prime_joules.toFixed(0)} <span className="small font-sans text-muted">J</span>
+                                            {test.test_id}
                                         </td>
                                         <td className="py-3 text-center font-monospace small">
-                        <span className={`badge ${test.r_squared >= 0.95 ? 'bg-success bg-opacity-20 text-success' : 'bg-warning bg-opacity-20 text-warning'}`}>
-                          {(test.r_squared * 100).toFixed(1)}%
-                        </span>
+                                            {test.test_type}
+                                        </td>
+                                        <td className="py-3 text-center fw-bold text-success font-monospace">
+                                            {test.test_arm}
                                         </td>
                                         <td className="pe-4 py-3 text-end">
                                             <div className="d-inline-flex gap-2">

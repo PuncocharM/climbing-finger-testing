@@ -29,6 +29,13 @@ export enum TestArm {
     BOTH = "both",
 }
 
+export interface TestSchema {
+    timestamp: string,
+    test_id: string,
+    test_type: TestType,
+    test_arm: TestArm,
+}
+
 export function generateTestId(prefix: string): string {
     const now = new Date();
     return `${prefix}${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -57,16 +64,16 @@ export function playBeep(frequency: number, durationMs: number) {
 }
 
 
-export function sendNewTest(test_id: string | null, test_type: TestType, testArm: TestArm | null) {
+export function sendNewTest(test_id: string, test_type: TestType, testArm: TestArm) {
     const timestamp = new Date().toISOString();
-    axios.post(
+    axios.post<TestSchema>(
         config.apiEndpoint + "/test/new",
-        JSON.stringify({
+        {
             timestamp: timestamp,
             test_id: test_id,
             test_type: test_type,
             test_arm: testArm,
-        }),
+        } as TestSchema,
         {
             headers: {"Content-Type": "application/json"},
         })
