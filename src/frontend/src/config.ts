@@ -19,6 +19,7 @@ export interface TestParams {
     testIdPrefix: string;
     testTitle: string;
     testSubtitle?: string;
+    testDescription?: string;
     pullDuration: number;
     restDuration: number;
     numberSets: number;
@@ -48,6 +49,7 @@ export function testTypeParams(testType: TestType): TestParams {
             return {
                 testIdPrefix: 'TEST_PF_',
                 testTitle: 'Peak Force Test',
+                testDescription: "Warm up to ~80% of expected maximum and take 3-5 minutes rest. Each pull build force over 1-2 seconds.",
                 pullDuration: config.PEAK_FORCE_PULL_DURATION,
                 restDuration: config.PEAK_FORCE_REST_DURATION,
                 numberSets: config.PEAK_FORCE_NUMBER_SETS,

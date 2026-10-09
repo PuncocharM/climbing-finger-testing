@@ -1,15 +1,16 @@
-import {useRef, useState} from "react";
+import React, {useRef, useState} from "react";
 import {useNavigate} from "react-router";
 import {
     generateTestId, getPhaseStyles, playBeep,
     sendNewTest,
-    sendPhaseSync,
+    sendPhaseSync, TestArm,
     TestPhase,
     TestPhaseEvent,
     TestType
 } from "./test-commons.ts";
 import {config, testTypeParams} from "../config.ts";
 import {Scale} from "./Scale.tsx";
+import "../../styles/common.scss"
 
 
 
@@ -35,9 +36,15 @@ function _Test({testType, resetTest}:{
     const testParams = testTypeParams(testType);
 
 
-    const startTest = () => {
+    const startTest = (e: React.SubmitEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const testArm = formData.get("arm") as TestArm;
+
+
         currentTestIdRef.current = generateTestId(testParams.testIdPrefix);
-        sendNewTest(currentTestIdRef.current, testType)
+        sendNewTest(currentTestIdRef.current, testType, testArm)
         sendPhaseSync(TestPhaseEvent.TEST_START, currentTestIdRef.current);
 
         const now = performance.now();
@@ -183,10 +190,32 @@ function _Test({testType, resetTest}:{
                     <Scale displayMaxWeight={false} resetWeightRef={resetWeightRef}/>
                     <div className="d-grid gap-2">
                         {phase === 'idle' ? (
-                            <button onClick={startTest}
-                                    className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
-                                Start Test
-                            </button>
+                            <>
+                                <div className="card card-body bg-secondary">
+                                    <p>{testParams.testDescription}</p>
+                                    <form onSubmit={startTest} className="d-grid gap-3">
+                                        <div className="mx-auto">
+                                            <div className="input-group">
+                                                <input type="radio" className="btn-check" name="arm" id="option1"
+                                                       autoComplete="off" value={TestArm.LEFT} defaultChecked={true}/>
+                                                <label className="btn btn-outline-light" style={{
+                                                    borderTopLeftRadius: "0.375em",
+                                                    borderBottomLeftRadius: "0.375em"
+                                                }} htmlFor="option1">Left arm</label>
+
+                                                <input type="radio" className="btn-check" name="arm" id="option2" autoComplete="off" value={TestArm.RIGHT}/>
+                                                <label className="btn btn-outline-light" htmlFor="option2">Right arm</label>
+
+                                                <input type="radio" className="btn-check" name="arm" id="option3" autoComplete="off" value={TestArm.BOTH}/>
+                                                <label className="btn btn-outline-light" htmlFor="option3">Both arms</label>
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
+                                            Start Test
+                                        </button>
+                                    </form>
+                                </div>
+                            </>
                         ) : (
                             <button onClick={abortTest}
                                     className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">

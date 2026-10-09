@@ -198,6 +198,7 @@ class NewTestRequest(BaseModel):
     timestamp: str
     test_id: str
     test_type: str
+    test_arm: str
 
 @app.post("/api/test/new")
 def create_new_test(new_test_request: NewTestRequest):
@@ -206,6 +207,7 @@ def create_new_test(new_test_request: NewTestRequest):
             new_test_request.timestamp,
             new_test_request.test_id,
             new_test_request.test_type,
+            new_test_request.test_arm,
         ]
 
         with open(Config.LOG_FILE_TESTS, "a", newline="") as f:

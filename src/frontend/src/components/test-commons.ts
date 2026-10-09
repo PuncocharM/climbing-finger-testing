@@ -23,6 +23,12 @@ export enum TestType {
     PEAK_FORCE = "PEAK_FORCE",
 }
 
+export enum TestArm {
+    LEFT = "left",
+    RIGHT = "right",
+    BOTH = "both",
+}
+
 export function generateTestId(prefix: string): string {
     const now = new Date();
     return `${prefix}${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -51,7 +57,7 @@ export function playBeep(frequency: number, durationMs: number) {
 }
 
 
-export function sendNewTest(test_id: string | null, test_type: TestType) {
+export function sendNewTest(test_id: string | null, test_type: TestType, testArm: TestArm | null) {
     const timestamp = new Date().toISOString();
     axios.post(
         config.apiEndpoint + "/test/new",
@@ -59,6 +65,7 @@ export function sendNewTest(test_id: string | null, test_type: TestType) {
             timestamp: timestamp,
             test_id: test_id,
             test_type: test_type,
+            test_arm: testArm,
         }),
         {
             headers: {"Content-Type": "application/json"},
