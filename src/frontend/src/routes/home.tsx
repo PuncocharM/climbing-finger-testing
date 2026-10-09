@@ -37,6 +37,8 @@ export default function Home(): React.JSX.Element {
 
   }
 
+
+
   return (
       <>
         <div className="bg-dark text-light min-vh-screen d-flex align-items-center justify-content-center">
@@ -48,26 +50,20 @@ export default function Home(): React.JSX.Element {
             <div className="row g-2 mb-2">
               <div className="col-4">
                 <button onClick={() => sendCommand('tare')}
-                        className="btn btn-primary w-100 py-3 fw-bold rounded-3">Tare
+                        className="btn btn-primary w-100 py-2 fw-bold rounded-3 h-100">Tare
                 </button>
               </div>
               <div className="col-4">
-                <button onClick={() => sendCommand('start')}
-                        className="btn btn-success w-100 py-3 fw-bold rounded-3">Start
-                </button>
-              </div>
-              <div className="col-4">
-                <button onClick={() => sendCommand('stop')}
-                        className="btn btn-danger w-100 py-3 fw-bold rounded-3">Stop
-                </button>
-              </div>
-            </div>
-
-            <div className="row g-2 mb-2">
-              <div className="col-12">
                 <button onClick={() => resetWeightRef.current && resetWeightRef.current()}
-                        className="btn btn-outline-light w-100 py-2 fw-bold rounded-3">
+                        className="btn btn-warning w-100 py-2 fw-bold rounded-3 h-100">
                   Reset Max Weight
+                </button>
+              </div>
+              <div className="col-4">
+                <button
+                    data-bs-toggle="modal" data-bs-target="#calibrateModal"
+                    className="btn btn-dark w-100 py-2 fw-bold rounded-3 h-100"
+                >Calibrate
                 </button>
               </div>
             </div>
@@ -101,15 +97,7 @@ export default function Home(): React.JSX.Element {
                 >View past tests
                 </button>
               </div>
-              <div className="col-12">
-                <button
-                    data-bs-toggle="modal" data-bs-target="#calibrateModal"
-                    className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
-                >Calibrate
-                </button>
-              </div>
             </div>
-
           </div>
         </div>
         <div className="modal fade" id="calibrateModal">
@@ -120,9 +108,14 @@ export default function Home(): React.JSX.Element {
                 <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div className="modal-body">
+                <p>
+                  Place a known weight on the scale. Make sure it is tared first.
+                </p>
                 <form onSubmit={e => calibrate(e)}>
-                  <input type="text" name="weight"/>
-                  <button className="btn btn-primary" type="submit">Calibrate</button>
+                  <div className="input-group">
+                    <input className="form-control" type="text" name="weight" placeholder="Placed weight in kg"/>
+                    <button className="btn btn-primary" type="submit">Calibrate</button>
+                  </div>
                 </form>
               </div>
               <div className="modal-footer">
