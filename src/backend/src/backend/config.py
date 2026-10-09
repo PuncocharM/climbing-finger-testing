@@ -1,4 +1,10 @@
+import logging
 import pathlib
+import sys
+
+log = logging.getLogger()
+# logger.setLevel(logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 class Config:
     SERIAL_PORT = "COM6"
