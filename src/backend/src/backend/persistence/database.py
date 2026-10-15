@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Sequence
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+
+from sqlite3 import Connection as SQLite3Connection
 
 from persistence.model import TestEntryEntity, Base, TestEventEntity
 
@@ -49,6 +51,16 @@ def _session_scope() -> Iterator[Session]:
         session.close()
 
 
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """Enforce a foreign key constraints in SQLite database
+    """
+    if isinstance(dbapi_connection, SQLite3Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.close()
+
+
 def save_test_entry(entry: TestEntryEntity) -> TestEntryEntity:
     """Persist a new TestEntry.
 
@@ -58,9 +70,7 @@ def save_test_entry(entry: TestEntryEntity) -> TestEntryEntity:
         with _session_scope() as session:
             session.add(entry)
     except IntegrityError as exc:
-        raise DuplicateTestEntryError(
-            f"A TestEntry with test_id={entry.test_id!r} already exists."
-        ) from exc
+        raise DuplicateTestEntryError(f"A TestEntry with test_id={entry.test_id!r} already exists.") from exc
     return entry
 
 
@@ -70,10 +80,10 @@ def get_test_entry_by_id(test_id: str) -> Optional[TestEntryEntity]:
         return session.get(TestEntryEntity, test_id)
 
 
-def get_all_test_entries() -> list[TestEntryEntity]:
+def get_all_test_entries() -> Sequence[TestEntryEntity]:
     """Return all TestEntry rows, ordered by timestamp (oldest first)."""
     with _session_scope() as session:
-        return list(session.scalars(select(TestEntryEntity).order_by(TestEntryEntity.timestamp)))
+        return session.scalars(select(TestEntryEntity).order_by(TestEntryEntity.timestamp)).all()
 
 
 def delete_test_entry(test_id: str) -> bool:
@@ -94,3 +104,14 @@ def save_test_event(test_event: TestEventEntity) -> TestEventEntity:
         session.add(test_event)
 
     return test_event
+
+
+def get_test_event_by_id(event_id: int) -> Optional[TestEventEntity]:
+    with _session_scope() as session:
+        return session.get(TestEventEntity, event_id)
+
+
+def get_all_test_events() -> Sequence[TestEventEntity]:
+    with _session_scope() as session:
+        return session.scalars(select(TestEventEntity).order_by(TestEventEntity.timestamp)).all()
+

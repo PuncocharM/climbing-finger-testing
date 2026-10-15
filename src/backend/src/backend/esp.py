@@ -80,6 +80,11 @@ def serial_reader_worker(esp32: ESP32):
                         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                         buffer.append([timestamp, current_weight, esp32.get_connection_status()])
 
+                        # TODO: rethink this:
+                        #  1. keep using CSV file, but
+                        #   1a. change filename for each session
+                        #   1b. check for some native buffering implementation
+                        #  2. try some high frequency database
                         if len(buffer) >= Config.LOG_BUFFER_SIZE:
                             with open(Config.LOG_FILE_DATA, "a", newline="") as f:
                                 writer = csv.writer(f)

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import sys
 import threading
@@ -53,13 +52,11 @@ async def broadcast_data_stream(esp32: ESP32, connected_clients: set[WebSocket])
                 "status": esp32.get_connection_status()
             }
 
-            message = json.dumps(payload)
             await asyncio.gather(
-                *[client.send_text(message) for client in connected_clients],
+                *[client.send_json(payload) for client in connected_clients],
                 return_exceptions=True
             )
         await asyncio.sleep(Config.BROADCAST_FREQUENCY)
-
 
 
 @app.websocket("/ws")
@@ -72,17 +69,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Listen for incoming control commands from the browser front-end
-            data = await websocket.receive_text()
-            # try:
-            #     command_data = json.loads(data)
-            #     cmd = command_data.get("command", "").upper()
-            #
-            #     if cmd in ["TARE", "START", "STOP"] and esp32.get_ser() and esp32.get_ser().is_open:
-            #         esp32.get_ser().write(f"{cmd}\n".encode('utf-8'))
-            #         log.info(f"Forwarded command to ESP32: {cmd}")
-            # except json.JSONDecodeError:
-            #     pass
+            await websocket.receive_text()
+
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
         log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
@@ -141,68 +129,6 @@ def fetch_single_test_details(test_id: str):
         raise HTTPException(status_code=404, detail="Record not found.")
 
     return test_entry_entity
-
-    # try:
-    #     test_entry_schema = parse_obj_as(TestEntrySchema, test_entry_entity)
-    # except ValidationError as e:
-    #     log.error(f"Cannot convert test entity to response: {str(e)}")
-    #     raise HTTPException(status_code=500, detail=f"Cannot convert test entity to response")
-
-
-    # return test_entry_schema
-
-    # result['set_peaks'] = json.loads(result['set_peaks_json'])
-    #
-    # try:
-    #     # 2. Open our dual logs
-    #     df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])
-    #     df_events = pd.read_csv(Config.LOG_FILE_EVENTS, names=["timestamp", "event", "status", "test_id"])
-    #
-    #     df_events['timestamp'] = pd.to_datetime(df_events['timestamp'])
-    #     df_data['timestamp'] = pd.to_datetime(df_data['timestamp'])
-    #
-    #     # 3. Find the exact boundary times for this specific TestID
-    #     test_events = df_events[df_events['test_id'] == test_id]
-    #     if test_events.empty:
-    #         result['raw_timeline'] = []
-    #         result['raw_forces'] = []
-    #         result['phase_markers'] = []
-    #         return result
-    #
-    #     start_time = test_events.iloc[0]['timestamp']
-    #     end_time = test_events.iloc[-1]['timestamp']
-    #
-    #     # 4. Slice out ALL high-frequency points inside this window
-    #     raw_slice = df_data[(df_data['timestamp'] >= start_time) & (df_data['timestamp'] <= end_time)].sort_values('timestamp')
-    #
-    #     # 5. Calculate elapsed seconds for the chart X-axis (e.g. 0s, 0.0125s, 0.025s...)
-    #     if not raw_slice.empty:
-    #         elapsed_seconds = (raw_slice['timestamp'] - start_time).dt.total_seconds().round(3).tolist()
-    #         forces = raw_slice['weight'].dropna().tolist()
-    #     else:
-    #         elapsed_seconds = []
-    #         forces = []
-    #
-    #     phase_markers = []
-    #     for _, row in test_events.iterrows():
-    #         marker_type = row['event']
-    #         # We care about tracking the offsets for Pull, Rest, and the initial Countdown
-    #         if marker_type in ['CRITICAL_FORCE_START', 'PULL_START', 'REST_START', 'TEST_END']:
-    #             offset = (row['timestamp'] - start_time).total_seconds()
-    #             phase_markers.append({
-    #                 "offset_seconds": round(offset, 3),
-    #                 "type": marker_type.replace("_START", "")
-    #             })
-    #
-    #     result['raw_timeline'] = elapsed_seconds  # X-Axis points
-    #     result['raw_forces'] = forces            # Y-Axis points
-    #     result['phase_markers'] = phase_markers  # Shading configuration array
-    #
-    #     return result
-    #
-    # except Exception as e:
-    #     print(e)
-    #     raise HTTPException(status_code=500, detail=f"Failed to compile raw timeseries: {str(e)}")
 
 
 def _send_command(command: str, esp32: ESP32):
