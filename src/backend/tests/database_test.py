@@ -8,16 +8,10 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from persistence import database
-from persistence.database import (
-    DuplicateTestEntryError,
-    delete_test_entry,
-    get_all_test_entries,
-    get_test_entry_by_id,
-    init_db,
-    save_test_entry,
-    save_test_event,
-)
-from persistence.model import TestEntryEntity, TestArm, TestEventEntity
+from persistence.database import init_db, save_test_entry, get_test_entry_by_id, DuplicateTestEntryError, \
+    get_all_test_entries, delete_test_entry, save_test_event, get_all_test_events, delete_test_event, \
+    save_peak_force_result, get_test_event_by_id
+from persistence.model import TestEntryEntity, TestArm, TestEventEntity, PeakForceTestResults
 from schemas import TestType, TestEventType
 
 DEFAULT_TEST_ENTRY_ID = "test-001"
@@ -131,7 +125,7 @@ def test_save_test_event_and_get_by_id(db):
                              event_type=TestEventType.PULL_START)
     test_event = save_test_event(test_event)
 
-    result = database.get_test_event_by_id(test_event.event_id)
+    result = get_test_event_by_id(test_event.event_id)
     assert result is not None
     assert result.test_id == test_entry.test_id
     assert result.timestamp == test_entry.timestamp
@@ -146,7 +140,7 @@ def test_save_test_event_wrong_test_id(db):
     with pytest.raises(IntegrityError):
         save_test_event(test_event)
 
-    events = database.get_all_test_events()
+    events = get_all_test_events()
     assert len(events) == 0
 
 
@@ -160,11 +154,42 @@ def test_delete_test_cascades_events(db):
                                  event_type=TestEventType.PULL_START)
     save_test_event(test_event)
 
-    events_before = database.get_all_test_events()
+    events_before = get_all_test_events()
     assert len(events_before) == 1
 
-    result_delete = database.delete_test_entry(DEFAULT_TEST_ENTRY_ID)
+    result_delete = delete_test_entry(DEFAULT_TEST_ENTRY_ID)
     assert result_delete is True
 
-    events_after = database.get_all_test_events()
+    events_after = get_all_test_events()
     assert len(events_after) == 0
+
+
+def test_delete_event(db):
+    test_entry = make_entry()
+    test_entry = save_test_entry(test_entry)
+
+
+    test_event = TestEventEntity(test_id=test_entry.test_id, timestamp=test_entry.timestamp,
+                                 event_type=TestEventType.PULL_START)
+    save_test_event(test_event)
+
+    tests_before = get_all_test_entries()
+    assert len(tests_before) == 1
+    events_before = get_all_test_events()
+    assert len(events_before) == 1
+
+    delete_test_event(test_event.event_id)
+
+    tests_after = get_all_test_entries()
+    assert len(tests_after) == 1
+    events_after = get_all_test_events()
+    assert len(events_after) == 0
+
+
+def test_save_peak_force_test_result(db):
+    test_entry = make_entry()
+    test_entry = save_test_entry(test_entry)
+
+    pftr = PeakForceTestResults(test_id=test_entry.test_id, set_peaks=[0.5, -1.4, 5], max_force=5)
+    save_peak_force_result(pftr)
+    

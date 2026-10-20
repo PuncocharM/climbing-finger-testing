@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sqlite3 import Connection as SQLite3Connection
 
-from persistence.model import TestEntryEntity, Base, TestEventEntity
+from persistence.model import TestEntryEntity, Base, TestEventEntity, PeakForceTestResults
 
 
 class DuplicateTestEntryError(Exception):
@@ -111,7 +111,27 @@ def get_test_event_by_id(event_id: int) -> Optional[TestEventEntity]:
         return session.get(TestEventEntity, event_id)
 
 
+def get_test_events_by_test_id(test_id: str) -> Sequence[TestEventEntity]:
+    with _session_scope() as session:
+        return session.scalars(select(TestEventEntity).where(TestEventEntity.test_id == test_id)).all()
+
+
 def get_all_test_events() -> Sequence[TestEventEntity]:
     with _session_scope() as session:
         return session.scalars(select(TestEventEntity).order_by(TestEventEntity.timestamp)).all()
 
+
+def delete_test_event(event_id: int) -> bool:
+    with _session_scope() as session:
+        test_event = session.get(TestEventEntity, event_id)
+        if test_event is None:
+            return False
+        session.delete(test_event)
+        return True
+
+
+def save_peak_force_result(peak_force_test_result: PeakForceTestResults) -> PeakForceTestResults:
+    with _session_scope() as session:
+        session.add(peak_force_test_result)
+
+    return peak_force_test_result
