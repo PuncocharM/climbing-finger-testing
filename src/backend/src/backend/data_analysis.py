@@ -37,6 +37,8 @@ def analyze_peak_force(test: TestEntryEntity, test_events: Sequence[TestEventEnt
                     peak = float(pull_data.max())
                     set_peaks.append(peak)
 
+                pull_start = None
+
     pftr = PeakForceTestResults(test_id=test.test_id, set_peaks=set_peaks, max_force=max(set_peaks))
     database.save_peak_force_result(pftr)
 

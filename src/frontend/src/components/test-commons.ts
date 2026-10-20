@@ -64,23 +64,26 @@ export function playBeep(frequency: number, durationMs: number) {
 }
 
 
-export function sendNewTest(test_id: string, test_type: TestType, testArm: TestArm) {
+export async function sendNewTest(test_id: string, test_type: TestType, testArm: TestArm) {
     const timestamp = new Date().toISOString();
-    axios.post<TestSchema>(
-        config.apiEndpoint + "/test/new",
-        {
-            timestamp: timestamp,
-            test_id: test_id,
-            test_type: test_type,
-            test_arm: testArm,
-        } as TestSchema,
-        {
-            headers: {"Content-Type": "application/json"},
-        })
-        .catch(e => console.error("Error creating new test: " + e));
+    try {
+        return await axios.post<TestSchema>(
+            config.apiEndpoint + "/test/new",
+            {
+                timestamp: timestamp,
+                test_id: test_id,
+                test_type: test_type,
+                test_arm: testArm,
+            } as TestSchema,
+            {
+                headers: {"Content-Type": "application/json"},
+            });
+    } catch (e) {
+        return console.error("Error creating new test: " + e);
+    }
 }
 
-export function sendPhaseSync (event: TestPhaseEvent, test_id: string | null) {
+export function sendTestPhase (event: TestPhaseEvent, test_id: string | null) {
     if (test_id === null) {
         console.error("Test id is null");
         return;

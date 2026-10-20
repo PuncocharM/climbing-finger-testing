@@ -14,7 +14,7 @@ from esp import ESP32, serial_reader_worker
 from persistence.database import init_db, get_all_test_entries, get_test_entry_by_id, delete_test_entry, save_test_entry, \
     DuplicateTestEntryError, save_test_event
 from persistence.model import TestEntryEntity, TestEventEntity
-from schemas import TestEntrySchema, TestEventSchema, Commands
+from schemas import TestEntrySchema, TestEventSchema, Commands, TestEventType
 
 
 @asynccontextmanager
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield {'esp32': esp32, 'connected_clients': connected_clients}
 
 app = FastAPI(lifespan=lifespan, title="ESP32 Load Cell Telemetry Server")
-app.frontend('/', directory='../../static', fallback="index.html")
+app.frontend('/', directory=Config.STATIC_DIRECTORY, fallback="index.html")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Adjust this in production
@@ -111,7 +111,7 @@ async def log_test_event(test_event: TestEventSchema, background_tasks: Backgrou
         log.error(f"Cannot save test event: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Cannot save the test")
 
-    if test_event.event_type == "TEST_END":
+    if test_event.event_type == TestEventType.TEST_END:
         background_tasks.add_task(process_test_analytics, test_event.test_id)
 
     log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")

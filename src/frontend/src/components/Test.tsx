@@ -5,7 +5,7 @@ import {
     getPhaseStyles,
     playBeep,
     sendNewTest,
-    sendPhaseSync,
+    sendTestPhase,
     TestArm,
     TestPhase,
     TestPhaseEvent,
@@ -36,7 +36,7 @@ function _Test({testType, resetTest}:{
     const testParams = testTypeParams(testType);
 
 
-    const startTest = (e: React.SubmitEvent<HTMLFormElement>) => {
+    const startTest = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -44,8 +44,8 @@ function _Test({testType, resetTest}:{
 
 
         currentTestIdRef.current = generateTestId(testParams.testIdPrefix);
-        sendNewTest(currentTestIdRef.current, testType, testArm)
-        sendPhaseSync(TestPhaseEvent.TEST_START, currentTestIdRef.current);
+        await sendNewTest(currentTestIdRef.current, testType, testArm)
+        sendTestPhase(TestPhaseEvent.TEST_START, currentTestIdRef.current);
 
         const now = performance.now();
         phaseRef.current = TestPhase.countdown;
@@ -86,7 +86,7 @@ function _Test({testType, resetTest}:{
                     resetMaxWeight()
                     phaseRef.current = TestPhase.pull;
                     setPhase(TestPhase.pull);
-                    sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
+                    sendTestPhase(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
                     phaseEndTimeRef.current += testParams.pullDuration * 1000;
                     lastTriggeredSecondRef.current = testParams.pullDuration;
@@ -97,7 +97,7 @@ function _Test({testType, resetTest}:{
                         playBeep(1200, 1000);
                         phaseRef.current = TestPhase.finished;
                         setPhase(TestPhase.finished);
-                        sendPhaseSync(TestPhaseEvent.TEST_END, currentTestIdRef.current);
+                        sendTestPhase(TestPhaseEvent.TEST_END, currentTestIdRef.current);
 
                         if (timerRef.current) {
                             clearInterval(timerRef.current);
@@ -107,7 +107,7 @@ function _Test({testType, resetTest}:{
                         playBeep(550, 400);
                         phaseRef.current = TestPhase.rest;
                         setPhase(TestPhase.rest);
-                        sendPhaseSync(TestPhaseEvent.REST_START, currentTestIdRef.current);
+                        sendTestPhase(TestPhaseEvent.REST_START, currentTestIdRef.current);
 
                         phaseEndTimeRef.current += testParams.restDuration * 1000;
                         lastTriggeredSecondRef.current = testParams.restDuration;
@@ -119,7 +119,7 @@ function _Test({testType, resetTest}:{
                     resetMaxWeight()
                     phaseRef.current = TestPhase.pull;
                     setPhase(TestPhase.pull);
-                    sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
+                    sendTestPhase(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
                     phaseEndTimeRef.current += testParams.pullDuration * 1000;
                     lastTriggeredSecondRef.current = testParams.pullDuration;
@@ -134,7 +134,7 @@ function _Test({testType, resetTest}:{
     };
 
     const abortTest = () => {
-        sendPhaseSync(TestPhaseEvent.TEST_ABORT, currentTestIdRef.current);
+        sendTestPhase(TestPhaseEvent.TEST_ABORT, currentTestIdRef.current);
 
         if (timerRef.current) {
             clearInterval(timerRef.current);
