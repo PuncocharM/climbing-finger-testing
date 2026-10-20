@@ -1,40 +1,25 @@
-import axios from "axios";
-import {config} from "../config.ts";
 import {useNavigate} from "react-router";
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
-import {Scale} from "../components/Scale.tsx";
-import React, {useRef} from "react";
+import {resetMaxWeight, Scale, sendCalibrate, sendCommand} from "../components/Scale.tsx";
+import React from "react";
 import "../../styles/common.scss"
 
 export default function Home(): React.JSX.Element {
-  const resetWeightRef = useRef<() => void>(null);
   const navigate = useNavigate();
 
 
-  const sendCommand = (command: 'tare' | 'start' | 'stop'): void => {
-    axios.post(config.apiEndpoint + "/command/" + command)
-        .catch(error => {alert("Error sending command " + command + ": " + error)})
-  };
 
-
-
-  function calibrate(e: React.SubmitEvent<HTMLFormElement>) {
+  function submitCalibrate(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const form = e.target;
     const formData = new FormData(form);
     const weight = formData.get("weight");
-
-    axios.post(
-        config.apiEndpoint + "/command/calibrate",
-        null,
-        {
-          'params': {'weight': weight},
-        }
-
-    )
-    .catch(error => console.log("Error sending command calibrate: " + error))
-
+    if (weight == null) {
+      alert("Please enter a weight");
+      return null;
+    }
+    sendCalibrate(Number(weight));
   }
 
 
@@ -45,7 +30,7 @@ export default function Home(): React.JSX.Element {
           <div className="card bg-secondary bg-gradient border-secondary shadow-lg p-4 w-100"
                style={{maxWidth: '450px', borderRadius: '1rem'}}>
 
-            <Scale displayMaxWeight={true} resetWeightRef={resetWeightRef}/>
+            <Scale displayMaxWeight={true} />
 
             <div className="row g-2 mb-2">
               <div className="col-4">
@@ -54,7 +39,7 @@ export default function Home(): React.JSX.Element {
                 </button>
               </div>
               <div className="col-4">
-                <button onClick={() => resetWeightRef.current && resetWeightRef.current()}
+                <button onClick={resetMaxWeight}
                         className="btn btn-warning w-100 py-2 fw-bold rounded-3 h-100">
                   Reset Max Weight
                 </button>
@@ -111,7 +96,7 @@ export default function Home(): React.JSX.Element {
                 <p>
                   Place a known weight on the scale. Make sure it is tared first.
                 </p>
-                <form onSubmit={e => calibrate(e)}>
+                <form onSubmit={e => submitCalibrate(e)}>
                   <div className="input-group">
                     <input className="form-control" type="text" name="weight" placeholder="Placed weight in kg"/>
                     <button className="btn btn-primary" type="submit">Calibrate</button>

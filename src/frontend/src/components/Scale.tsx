@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import {config} from "../config.ts";
 import axios from "axios";
 
@@ -14,9 +14,34 @@ interface TelemetryData {
     status: string;
 }
 
-export function Scale({displayMaxWeight, resetWeightRef}: {
+
+type Command = 'tare' | 'start' | 'stop'
+
+export function sendCommand(command: Command) {
+    axios.post(config.apiEndpoint + "/command/" + command)
+        .catch(error => {
+            alert("Error sending command " + command + ": " + error)
+        })
+}
+
+export function sendCalibrate(weight: number) {
+    axios.post(
+        config.apiEndpoint + "/command/calibrate",
+        null,
+        {
+            'params': {'weight': weight},
+        }
+    )
+        .catch(error => console.log("Error sending command calibrate: " + error))
+}
+
+export function resetMaxWeight() {
+    axios.post(config.apiEndpoint + "/command/reset_max_weight")
+        .catch(e => console.error("Error sending reset max weight command: " + e));
+}
+
+export function Scale({displayMaxWeight}: {
     displayMaxWeight: boolean,
-    resetWeightRef?: React.RefObject<(() => void) | null>
 }) {
     const [currentWeight, setCurrentWeight] = useState<number | null>(null);
     const [maxWeight, setMaxWeight] = useState<number | null>(null);
@@ -76,16 +101,6 @@ export function Scale({displayMaxWeight, resetWeightRef}: {
             case "disconnected": return 'text-danger bg-dark';
             case "connecting": default: return 'text-warning bg-dark';
         }
-    }
-
-
-    const resetMaxWeight = () => {
-        axios.post(config.apiEndpoint + "/command/reset_max_weight")
-            .catch(e => console.error("Error sending reset max weight command: " + e));
-    }
-
-    if (resetWeightRef != null) {
-        resetWeightRef.current = resetMaxWeight
     }
 
     return (

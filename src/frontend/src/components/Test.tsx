@@ -1,18 +1,19 @@
 import React, {useRef, useState} from "react";
 import {useNavigate} from "react-router";
 import {
-    generateTestId, getPhaseStyles, playBeep,
+    generateTestId,
+    getPhaseStyles,
+    playBeep,
     sendNewTest,
-    sendPhaseSync, TestArm,
+    sendPhaseSync,
+    TestArm,
     TestPhase,
     TestPhaseEvent,
     TestType
 } from "./test-commons.ts";
 import {config, testTypeParams} from "../config.ts";
-import {Scale} from "./Scale.tsx";
+import {resetMaxWeight, Scale} from "./Scale.tsx";
 import "../../styles/common.scss"
-
-
 
 
 function _Test({testType, resetTest}:{
@@ -20,7 +21,6 @@ function _Test({testType, resetTest}:{
     resetTest: () => void,
 }) {
     const navigate = useNavigate();
-    const resetWeightRef = useRef<() => void>(null);
 
     const [phase, setPhase] = useState<TestPhase>(TestPhase.idle);
     const [currentSet, setCurrentSet] = useState<number>(1);
@@ -83,9 +83,9 @@ function _Test({testType, resetTest}:{
             switch (phaseRef.current) {
                 case TestPhase.countdown:
                     playBeep(880, 600);
+                    resetMaxWeight()
                     phaseRef.current = TestPhase.pull;
                     setPhase(TestPhase.pull);
-
                     sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
 
                     phaseEndTimeRef.current += testParams.pullDuration * 1000;
@@ -116,6 +116,7 @@ function _Test({testType, resetTest}:{
                     break;
                 case TestPhase.rest:
                     playBeep(880, 500);
+                    resetMaxWeight()
                     phaseRef.current = TestPhase.pull;
                     setPhase(TestPhase.pull);
                     sendPhaseSync(TestPhaseEvent.PULL_START, currentTestIdRef.current);
@@ -187,7 +188,7 @@ function _Test({testType, resetTest}:{
                     </div>
                 </div>
             ) : (<>
-                    <Scale displayMaxWeight={false} resetWeightRef={resetWeightRef}/>
+                    <Scale displayMaxWeight={testType == TestType.PEAK_FORCE} />
                     <div className="d-grid gap-2">
                         {phase === 'idle' ? (
                             <>
