@@ -3,6 +3,7 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js"
 import {resetMaxWeight, Scale, sendCalibrate, sendCommand} from "../components/Scale.tsx";
 import React from "react";
 import "../../styles/common.scss"
+import {PageContainer, ScaleContainer} from "../components/utilComponents.tsx";
 
 export default function Home(): React.JSX.Element {
   const navigate = useNavigate();
@@ -26,9 +27,8 @@ export default function Home(): React.JSX.Element {
 
   return (
       <>
-        <div className="bg-dark text-light min-vh-screen d-flex align-items-center justify-content-center">
-          <div className="card bg-secondary bg-gradient border-secondary shadow-lg p-4 w-100"
-               style={{maxWidth: '450px', borderRadius: '1rem'}}>
+        <PageContainer>
+          <ScaleContainer>
 
             <Scale displayMaxWeight={true} />
 
@@ -83,8 +83,9 @@ export default function Home(): React.JSX.Element {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          </ScaleContainer>
+        </PageContainer>
+
         <div className="modal fade" id="calibrateModal">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">

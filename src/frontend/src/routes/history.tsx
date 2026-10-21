@@ -5,6 +5,7 @@ import "../../styles/common.scss"
 import axios from "axios";
 import type {TestSchema} from "../components/test-commons.ts";
 import {config} from "../config.ts";
+import {ButtonHome, PageContainer} from "../components/utilComponents.tsx";
 
 
 export default function TestingHistory(): React.JSX.Element {
@@ -98,8 +99,10 @@ export default function TestingHistory(): React.JSX.Element {
     }
 
     return (
-        <div className="bg-dark text-light min-vh-screen p-4">
-            <div className="container-md py-4" style={{ maxWidth: '950px' }}>
+        <PageContainer>
+            <ButtonHome />
+
+            <div className="container-md py-4" style={{maxWidth: '950px'}}>
 
                 <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
                     <div>
@@ -183,6 +186,6 @@ export default function TestingHistory(): React.JSX.Element {
                 )}
 
             </div>
-        </div>
+        </PageContainer>
     );
 }

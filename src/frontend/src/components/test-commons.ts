@@ -110,7 +110,7 @@ export function getPhaseStyles (phase: TestPhase) {
         case TestPhase.pull: return { bg: 'bg-danger text-white animate-pulse', title: 'PULL HARD!' };
         case TestPhase.rest: return { bg: 'bg-primary text-white', title: 'REST' };
         case TestPhase.finished: return { bg: 'bg-success text-white', title: 'TEST COMPLETE' };
-        case TestPhase.idle: default: return { bg: 'bg-dark border-secondary', title: 'CRITICAL FORCE TEST' };
+        case TestPhase.idle: default: return { bg: 'bg-secondary border-secondary', title: 'CRITICAL FORCE TEST' };
     }
 }
 

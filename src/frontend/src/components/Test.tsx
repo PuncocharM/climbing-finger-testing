@@ -14,6 +14,7 @@ import {
 import {config, testTypeParams} from "../config.ts";
 import {resetMaxWeight, Scale} from "./Scale.tsx";
 import "../../styles/common.scss"
+import {ButtonHome, PageContainer, ScaleContainer} from "./utilComponents.tsx";
 
 
 function _Test({testType, resetTest}:{
@@ -148,8 +149,7 @@ function _Test({testType, resetTest}:{
     const uiTheme = getPhaseStyles(phase);
 
     return (
-        <div className={`card shadow-lg p-4 w-100 ${uiTheme.bg}`}
-                 style={{maxWidth: '450px', borderRadius: '1rem', transition: 'all 0.3s ease'}}>
+        <ScaleContainer bgStyle={uiTheme.bg} style={{transition: 'all 0.3s ease'}}>
             <div className="text-center mb-3">
                 <h1 className="fw-bold text-light">{testParams.testTitle}</h1>
                 {testParams.testSubtitle && <h2 className="text-light-emphasis">{testParams.testSubtitle}</h2>}
@@ -192,26 +192,26 @@ function _Test({testType, resetTest}:{
                     <div className="d-grid gap-2">
                         {phase === 'idle' ? (
                             <>
-                                <div className="card card-body bg-secondary">
+                                <div className="card card-body bg-dark-subtle">
                                     <p>{testParams.testDescription}</p>
                                     <form onSubmit={startTest} className="d-grid gap-3">
                                         <div className="mx-auto">
                                             <div className="input-group">
                                                 <input type="radio" className="btn-check" name="arm" id="option1"
                                                        autoComplete="off" value={TestArm.LEFT} defaultChecked={true}/>
-                                                <label className="btn btn-outline-light" style={{
+                                                <label className="btn btn-outline-dark" style={{
                                                     borderTopLeftRadius: "0.375em",
                                                     borderBottomLeftRadius: "0.375em"
                                                 }} htmlFor="option1">Left arm</label>
 
                                                 <input type="radio" className="btn-check" name="arm" id="option2" autoComplete="off" value={TestArm.RIGHT}/>
-                                                <label className="btn btn-outline-light" htmlFor="option2">Right arm</label>
+                                                <label className="btn btn-outline-dark" htmlFor="option2">Right arm</label>
 
                                                 <input type="radio" className="btn-check" name="arm" id="option3" autoComplete="off" value={TestArm.BOTH}/>
-                                                <label className="btn btn-outline-light" htmlFor="option3">Both arms</label>
+                                                <label className="btn btn-outline-dark" htmlFor="option3">Both arms</label>
                                             </div>
                                         </div>
-                                        <button type="submit" className="btn btn-light btn-lg py-3 fw-bold rounded-3 shadow-sm">
+                                        <button type="submit" className="btn btn-primary btn-lg py-3 fw-bold rounded-3 shadow-sm">
                                             Start Test
                                         </button>
                                     </form>
@@ -226,12 +226,11 @@ function _Test({testType, resetTest}:{
                     </div>
                 </>
             )}
-        </div>
+        </ScaleContainer>
     );
 }
 
 export function Test({testType}:{ testType: TestType }) {
-    const navigate = useNavigate();
     const [key, setKey] = useState<number>(0)
 
     const resetTest = () => {
@@ -239,12 +238,9 @@ export function Test({testType}:{ testType: TestType }) {
     }
 
     return (
-        <div className="bg-dark text-light min-vh-screen d-flex flex-column align-items-center justify-content-center p-3">
-            <button onClick={() => navigate("/")}
-                    className="btn btn-outline-secondary btn-sm mb-4 position-absolute top-0 start-0 m-3">
-                ← Back to Scale Dashboard
-            </button>
+        <PageContainer>
+            <ButtonHome />
             <_Test key={key} resetTest={resetTest} testType={testType}/>
-        </div>
+        </PageContainer>
     );
 }
