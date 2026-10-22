@@ -4,13 +4,15 @@ import sys
 import threading
 import time
 from contextlib import asynccontextmanager
+from typing import Sequence, List
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import Config, log
-from data_analysis import process_test_analytics
+from data_analysis import process_test_analytics, load_data
 from esp import ESP32, serial_reader_worker
+from persistence import database
 from persistence.database import init_db, get_all_test_entries, get_test_entry_by_id, delete_test_entry, save_test_entry, \
     DuplicateTestEntryError, save_test_event
 from persistence.model import TestEntryEntity, TestEventEntity
@@ -77,31 +79,56 @@ async def websocket_endpoint(websocket: WebSocket):
         log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
 
 
-@app.post("/api/test/new")
-def create_new_test(new_test_request: TestEntrySchema):
+@app.get("/api/test-entries", response_model=List[TestEntrySchema])
+def fetch_all_test_entries() -> Sequence[TestEntryEntity]:
+    return get_all_test_entries()
+
+
+@app.get("/api/test-entries/{test_id}", response_model=TestEntrySchema)
+def fetch_test_entry_by_id(test_id: str) -> TestEntryEntity:
+    test_entry_entity = get_test_entry_by_id(test_id)
+    if not test_entry_entity:
+        raise HTTPException(status_code=404, detail="Record not found.")
+
+    return test_entry_entity
+
+@app.post("/api/test-entries/new")
+def create_new_test_entry(new_test_entry_request: TestEntrySchema):
     try:
-        te = TestEntryEntity(**new_test_request.model_dump())
+        tee = TestEntryEntity(**new_test_entry_request.model_dump())
     except Exception as e:
         log.error(f"Cannot convert test request to entity: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a test {new_test_request.test_id}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a test {new_test_entry_request.test_id}")
 
     try:
-        save_test_entry(te)
+        save_test_entry(tee)
     except DuplicateTestEntryError as e:
-        log.error(f"Cannot save test with already existing test_it {new_test_request.test_id}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a test with already existing id {new_test_request.test_id}")
+        log.error(f"Cannot save test with already existing test_it {new_test_entry_request.test_id}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a test with already existing id {new_test_entry_request.test_id}")
     except Exception as e:
-        log.error(f"Cannot save test {new_test_request.test_id}")
+        log.error(f"Cannot save test {new_test_entry_request.test_id}")
         raise HTTPException(status_code=500, detail=f"Cannot save the test")
 
-    log.info(f"[{new_test_request.timestamp}] Recorded new test: {new_test_request.test_id}")
+    log.info(f"[{new_test_entry_request.timestamp}] Recorded new test: {new_test_entry_request.test_id}")
     return {"status": "success"}
 
 
-@app.post("/api/test/event")
-async def log_test_event(test_event: TestEventSchema, background_tasks: BackgroundTasks):
+@app.delete("/api/test-entries/{test_id}")
+def delete_test_entry(test_id: str):
+    success = delete_test_entry(test_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="The requested evaluation entry could not be found or was already removed."
+        )
+    log.info(f"[{test_id}] Test removed from database.")
+    return {"status": "deleted", "test_id": test_id}
+
+
+@app.post("/api/test-entries/{test_id}/test-events/new")
+async def log_test_event(test_id: str, test_event: TestEventSchema, background_tasks: BackgroundTasks):
     try:
-        te = TestEventEntity(**test_event.model_dump())
+        te = TestEventEntity(test_id=test_id, **test_event.model_dump())
     except Exception as e:
         log.error(f"Cannot convert test event request to entity: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Cannot create a test event {test_event}")
@@ -113,23 +140,38 @@ async def log_test_event(test_event: TestEventSchema, background_tasks: Backgrou
         raise HTTPException(status_code=500, detail=f"Cannot save the test")
 
     if test_event.event_type == TestEventType.TEST_END:
-        background_tasks.add_task(process_test_analytics, test_event.test_id)
+        background_tasks.add_task(process_test_analytics, test_id)
 
     log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
     return {"status": "success"}
 
-@app.get("/api/history")
-def fetch_history_index():
-    return get_all_test_entries()
+
+@app.get("/api/test-entries/{test_id}/test-events", response_model=List[TestEventSchema])
+def fetch_test_events(test_id: str) -> Sequence[TestEventEntity]:
+    return database.get_test_events_by_test_id(test_id)
 
 
-@app.get("/api/history/{test_id}", response_model=TestEntrySchema)
-def fetch_single_test_details(test_id: str):
-    test_entry_entity = get_test_entry_by_id(test_id)
-    if not test_entry_entity:
-        raise HTTPException(status_code=404, detail="Record not found.")
+@app.get("/api/test-entries/{test_id}/scale-data")
+def fetch_scale_data(test_id: str):
+    test_events = database.get_test_events_by_test_id(test_id)
+    if len(test_events) == 0:
+        log.error(f"No test events for test {test_id}")
+        raise HTTPException(status_code=400, detail=f"No test events for test {test_id}")
 
-    return test_entry_entity
+    timestamps = [te.timestamp for te in test_events]
+    test_start = min(timestamps)
+    test_end = max(timestamps)
+
+    df_data = load_data()
+
+    df_data_test = df_data[test_start:test_end]
+
+    return {
+        "timestamps": df_data_test.index.to_list(),
+        "weights": df_data_test["weight"].to_list(),
+        "max_weights": df_data_test["max_weight"].to_list(),
+    }
+
 
 
 def _send_command(command: str, esp32: ESP32):
@@ -146,27 +188,16 @@ def _send_command(command: str, esp32: ESP32):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
 
+
 @app.post("/api/command/calibrate")
 def calibrate(request: Request, weight: float):
     return _send_command(f"calibrate {weight}", request.state.esp32)
 
 
+
 @app.post("/api/command/{cmd}")
 def send_command(request: Request, cmd: Commands):
     return _send_command(cmd, request.state.esp32)
-
-
-
-@app.delete("/api/history/{test_id}")
-def delete_test(test_id: str):
-    success = delete_test_entry(test_id)
-    if not success:
-        raise HTTPException(
-            status_code=404,
-            detail="The requested evaluation entry could not be found or was already removed."
-        )
-    log.info(f"[{test_id}] Test removed from database.")
-    return {"status": "deleted", "test_id": test_id}
 
 
 if __name__ == "__main__":

@@ -38,7 +38,6 @@ class TestEventType(enum.Enum):
     TEST_ABORT = "TEST_ABORT"
 
 class TestEventSchema(BaseModel):
-    test_id: str
     timestamp: datetime
     event_type: TestEventType
 

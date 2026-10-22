@@ -68,7 +68,7 @@ export async function sendNewTest(test_id: string, test_type: TestType, testArm:
     const timestamp = new Date().toISOString();
     try {
         return await axios.post<TestSchema>(
-            config.apiEndpoint + "/test/new",
+            config.apiEndpoint + "/test-entries/new",
             {
                 timestamp: timestamp,
                 test_id: test_id,
@@ -91,9 +91,8 @@ export function sendTestPhase (event: TestPhaseEvent, test_id: string | null) {
 
     const timestamp = new Date().toISOString();
     axios.post(
-        config.apiEndpoint + "/test/event",
+        config.apiEndpoint + `/test-entries/${test_id}/test-events/new`,
         JSON.stringify({
-            test_id: test_id,
             timestamp: timestamp,
             event_type: event
         }),

@@ -43,14 +43,19 @@ def analyze_peak_force(test: TestEntryEntity, test_events: Sequence[TestEventEnt
     database.save_peak_force_result(pftr)
 
 
+def load_data():
+    df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "max_weight", "status"])
+    df_data['timestamp'] = pd.to_datetime(df_data['timestamp']) \
+        .dt.tz_localize(None)
+    df_data = df_data.set_index("timestamp")
+    return df_data
+
+
 
 def process_test_analytics(test_id: str):
     # try:
         time.sleep(1.5) # Allow final logging buffers to flush to disk
-        df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "status"])
-        df_data['timestamp'] = pd.to_datetime(df_data['timestamp']) \
-            .dt.tz_localize(None)
-        df_data = df_data.set_index("timestamp")
+        df_data = load_data()
 
         test = get_test_entry_by_id(test_id)
         if test is None:

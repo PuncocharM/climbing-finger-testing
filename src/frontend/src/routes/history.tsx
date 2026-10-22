@@ -18,7 +18,7 @@ export default function TestingHistory(): React.JSX.Element {
     function fetchPastTests() {
         setLoading(true);
         setError(null);
-        axios.get<TestSchema[]>(config.apiEndpoint + "/history")
+        axios.get<TestSchema[]>(config.apiEndpoint + "/test-entries")
             .then(r => {
                 setTests(r.data);
             })
@@ -38,7 +38,7 @@ export default function TestingHistory(): React.JSX.Element {
         const confirmed = window.confirm(`Are you sure you want to permanently delete test record ${testId}? This operation cannot be undone.`);
         if (!confirmed) return;
 
-        axios.delete(`${config.apiEndpoint}/history/${testId}`)
+        axios.delete(`${config.apiEndpoint}/test-entries/${testId}`)
             .then(() => {
                 fetchPastTests()
             })
