@@ -47,6 +47,7 @@ async def broadcast_data_stream(esp32: ESP32, connected_clients: set[WebSocket])
     while True:
         if connected_clients:
             payload = {
+                "timestamp": esp32.get_timestamp(),
                 "current_weight": esp32.get_current_weight(),
                 "max_weight": esp32.get_max_weight(),
                 "status": esp32.get_connection_status()

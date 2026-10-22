@@ -8,7 +8,8 @@ enum ConnectionStatus {
     disconnected = 'disconnected',
 }
 
-interface TelemetryData {
+interface StreamData {
+    timestamp: string | null;
     current_weight: number | null;
     max_weight: number | null;
     status: string;
@@ -58,10 +59,11 @@ export function Scale({displayMaxWeight}: {
 
         ws.onmessage = (event: MessageEvent) => {
             try {
-                const data: TelemetryData = JSON.parse(event.data);
+                const data: StreamData = JSON.parse(event.data);
                 setCurrentWeight(data.current_weight);
                 setMaxWeight(data.max_weight);
                 setEspStatus(data.status);
+                // const timestamp = data.timestamp && Date.parse(data.timestamp)
             } catch (error) {
                 console.error('Failed to parse incoming telemetry payload:', error);
             }

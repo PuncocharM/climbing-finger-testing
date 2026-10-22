@@ -19,6 +19,7 @@ class ESP32:
     _status: str
     _current_weight: float | None = None
     _max_weight: float | None = None
+    _timestamp: str | None = None
     _ser: serial.Serial | None = None
 
     def set_connection_status(self, connection_status: ConnectionStatus):
@@ -54,6 +55,12 @@ class ESP32:
     def get_max_weight(self):
         return self._max_weight
 
+    def set_timestamp(self, timestamp):
+        self._timestamp = timestamp
+
+    def get_timestamp(self):
+        return self._timestamp
+
 
 def serial_reader_worker(esp32: ESP32):
     time.sleep(1)  # wait a bit on server startup
@@ -73,12 +80,14 @@ def serial_reader_worker(esp32: ESP32):
 
             if ser.in_waiting > 0:
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
-                if line.startswith("DATA:CURRENT_WEIGHT:"):
+                if line.startswith("DATA:CURRENT_WEIGHT_MAX_WEIGHT:"):
                     try:
-                        current_weight = float(line.split(":")[2])
-                        esp32.set_current_weight(current_weight)
                         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-                        buffer.append([timestamp, current_weight, esp32.get_connection_status()])
+                        current_weight, max_weight = map(float, line.split(":")[2:])
+                        esp32.set_current_weight(current_weight)
+                        esp32.set_max_weight(max_weight)
+                        esp32.set_timestamp(timestamp)
+                        buffer.append([timestamp, current_weight, max_weight, esp32.get_connection_status()])
 
                         # TODO: rethink this:
                         #  1. keep using CSV file, but
@@ -92,13 +101,7 @@ def serial_reader_worker(esp32: ESP32):
                             buffer.clear()
 
                     except (ValueError, IndexError) as e:
-                        log.error(f"Error reading current weight: {e}")
-                elif line.startswith("DATA:MAX_WEIGHT:"):
-                    try:
-                        max_weight = float(line.split(":")[2])
-                        esp32.set_max_weight(max_weight)
-                    except (ValueError, IndexError) as e:
-                        log.error(f"Error reading max weight: {e}")
+                        log.error(f"Error reading current and max weight: {e}")
 
                 elif line.startswith("STATUS:"):
                     status = line[len("STATUS:"):].strip()

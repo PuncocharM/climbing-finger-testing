@@ -71,10 +71,9 @@ void loop() {
                 maxWeight = weight;
             }
 
-            Serial.print("DATA:CURRENT_WEIGHT:");
-            Serial.println(weight, OUTPUT_DECIMAL_PLACES);
-
-            Serial.print("DATA:MAX_WEIGHT:");
+            Serial.print("DATA:CURRENT_WEIGHT_MAX_WEIGHT:");
+            Serial.print(weight, OUTPUT_DECIMAL_PLACES);
+            Serial.print(":");
             Serial.println(maxWeight, OUTPUT_DECIMAL_PLACES);
         } else {
             Serial.println("ERROR:SCALE_NOT_FOUND");
