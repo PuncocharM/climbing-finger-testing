@@ -135,3 +135,8 @@ def save_peak_force_result(peak_force_test_result: PeakForceTestResults) -> Peak
         session.add(peak_force_test_result)
 
     return peak_force_test_result
+
+
+def get_peak_force_result(test_id: str) -> Optional[PeakForceTestResults]:
+    with _session_scope() as session:
+        return session.get(PeakForceTestResults, test_id)

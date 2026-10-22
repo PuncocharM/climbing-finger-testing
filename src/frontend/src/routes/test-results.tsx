@@ -11,11 +11,11 @@ import {
     LoadingSpinner,
     PageContainer
 } from "../components/utilComponents.tsx";
-import {type ScaleData, type TestEventSchema, type TestSchema} from "../components/test-commons.ts";
+import {type ScaleData, type TestEventSchema, type TestSchema, TestType} from "../components/test-commons.ts";
 import {config} from "../config.ts";
 
 import Chart from "../components/ChartTestData.tsx";
-
+import {TestResultsPeakForce} from "../components/TestResultsPeakForce.tsx";
 
 
 export default function TestResults() {
@@ -84,14 +84,17 @@ export default function TestResults() {
             <ButtonHome />
             <ButtonBackToTests />
             <div className="container-md py-4" style={{ maxWidth: '900px' }}>
-                <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
-                    <div>
+                <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-2">
+                    <div className="mb-4">
                         <h1 className="h3 fw-bold m-0">Test results</h1>
                         <div className="font-monospace small">ID: {testEntry.test_id}</div>
                         <div className="font-monospace small"><span className="text-capitalize">{testEntry.test_arm}</span> arm</div>
+                        {
+                            testEntry.test_type == TestType.PEAK_FORCE && <TestResultsPeakForce testId={testEntry.test_id} />
+                        }
                     </div>
                     {hasData && (
-                        <div className="btn-group btn-group-sm" role="group" aria-label="Chart zoom controls">
+                        <div className="btn-group btn-group-sm  mt-auto mb-0" role="group" aria-label="Chart zoom controls">
                             <button type="button" className="btn btn-outline-light"
                                     onClick={() => chartRef.current?.zoom(1.25)}>+</button>
                             <button type="button" className="btn btn-outline-light"

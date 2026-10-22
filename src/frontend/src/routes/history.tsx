@@ -127,8 +127,6 @@ export default function TestingHistory(): React.JSX.Element {
                                 {filteredTests.map((test) => (
                                     <tr
                                         key={test.test_id}
-                                        onClick={() => navigate(`/test-results/${test.test_id}`)}
-                                        style={{cursor: 'pointer'}}
                                     >
                                         <td className="ps-4 py-3 fw-semibold font-monospace small text-emerald-400">
                                             {formatDisplayDate(test.timestamp)}
@@ -144,7 +142,10 @@ export default function TestingHistory(): React.JSX.Element {
                                         </td>
                                         <td className="pe-4 py-3 text-end">
                                             <div className="d-inline-flex gap-2">
-                                                <button className="btn btn-sm btn-outline-info rounded-pill px-3">
+                                                <button
+                                                    onClick={() => navigate(`/test-results/${test.test_id}`)}
+                                                    className="btn btn-sm btn-outline-info rounded-pill px-3"
+                                                >
                                                     View
                                                 </button>
                                                 <button

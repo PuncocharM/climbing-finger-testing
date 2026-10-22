@@ -15,7 +15,7 @@ from esp import ESP32, serial_reader_worker
 from persistence import database
 from persistence.database import init_db, get_all_test_entries, get_test_entry_by_id, delete_test_entry, save_test_entry, \
     DuplicateTestEntryError, save_test_event
-from persistence.model import TestEntryEntity, TestEventEntity
+from persistence.model import TestEntryEntity, TestEventEntity, PeakForceTestResults
 from schemas import TestEntrySchema, TestEventSchema, Commands, TestEventType
 
 
@@ -88,7 +88,7 @@ def fetch_all_test_entries() -> Sequence[TestEntryEntity]:
 def fetch_test_entry_by_id(test_id: str) -> TestEntryEntity:
     test_entry_entity = get_test_entry_by_id(test_id)
     if not test_entry_entity:
-        raise HTTPException(status_code=404, detail="Record not found.")
+        raise HTTPException(status_code=404, detail=f"Test entry not found {test_id}.")
 
     return test_entry_entity
 
@@ -171,6 +171,14 @@ def fetch_scale_data(test_id: str):
         "weights": df_data_test["weight"].to_list(),
         "max_weights": df_data_test["max_weight"].to_list(),
     }
+
+
+@app.get("/api/test-entries/{test_id}/test-results-peak-force")
+def fetch_test_results_peak_force(test_id: str) -> PeakForceTestResults:
+    result = database.get_peak_force_result(test_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Test results not found for test {test_id}")
+    return result
 
 
 
