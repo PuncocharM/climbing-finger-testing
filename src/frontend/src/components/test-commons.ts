@@ -113,3 +113,13 @@ export function getPhaseStyles (phase: TestPhase) {
     }
 }
 
+export interface TestEventSchema {
+    timestamp: string;
+    event_type: TestPhaseEvent;
+}
+
+export interface ScaleData {
+    timestamps: string[];
+    weights: number[];
+    max_weights: number[];
+}
