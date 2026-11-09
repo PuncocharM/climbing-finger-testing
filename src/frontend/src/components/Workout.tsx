@@ -18,6 +18,30 @@ import {ButtonHome, PageContainer, ScaleContainer} from "./utilComponents.tsx";
 import {capFirst} from "../utils.ts";
 
 
+function InputWorkoutArm() {
+    return (
+        <div className="mx-auto">
+            <div className="input-group">
+                <input type="radio" className="btn-check" name="arm" id="option1"
+                       autoComplete="off" value={WorkoutArm.LEFT} defaultChecked={true}/>
+                <label className="btn btn-outline-dark" style={{
+                    borderTopLeftRadius: "0.375em",
+                    borderBottomLeftRadius: "0.375em"
+                }} htmlFor="option1">Left arm</label>
+
+                <input type="radio" className="btn-check" name="arm" id="option2" autoComplete="off"
+                       value={WorkoutArm.RIGHT}/>
+                <label className="btn btn-outline-dark" htmlFor="option2">Right arm</label>
+
+                <input type="radio" className="btn-check" name="arm" id="option3" autoComplete="off"
+                       value={WorkoutArm.BOTH}/>
+                <label className="btn btn-outline-dark" htmlFor="option3">Both arms</label>
+            </div>
+        </div>
+    )
+}
+
+
 function NumberInputRow({field_id, field_name, defaultValue}: {field_id: string, field_name: string, defaultValue: number}) {
     return (
         <div className="row g-3">
@@ -32,7 +56,6 @@ function NumberInputRow({field_id, field_name, defaultValue}: {field_id: string,
     )
 }
 
-
 function RepeaterStructureInput({repeaterStructure}: { repeaterStructure: RepeaterStructure }) {
     return <>
         <NumberInputRow field_id="numberSets" field_name="Number of sets" defaultValue={repeaterStructure.numberSets}/>
@@ -42,6 +65,40 @@ function RepeaterStructureInput({repeaterStructure}: { repeaterStructure: Repeat
         <NumberInputRow field_id="restRepsDuration" field_name="Rest between reps [s]" defaultValue={repeaterStructure.restRepsDuration}/>
         <NumberInputRow field_id="restSetsDuration" field_name="Rest between sets [s]" defaultValue={repeaterStructure.restSetsDuration}/>
     </>;
+}
+
+function TargetWeightInput() {
+    const [targetWeight, setTargetWeight] = useState<boolean>(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.currentTarget.value == "targetWeight") {
+            setTargetWeight(true)
+        } else if (e.currentTarget.value == "maxPull") {
+            setTargetWeight(false)
+        } else {
+            console.error("Unrecognized radio value")
+        }
+    }
+
+    return <>
+        <div className="mx-auto">
+            <div className="input-group">
+                <input type="radio" className="btn-check" name="targetWeightOrMaxPull" id="maxPull" autoComplete="off"
+                       value="maxPull" onChange={handleChange} defaultChecked={!targetWeight} />
+                <label className="btn btn-outline-dark" htmlFor="maxPull" style={{
+                    borderTopLeftRadius: "0.375em",
+                    borderBottomLeftRadius: "0.375em"
+                }}>Max pull</label>
+
+                <input type="radio" className="btn-check" name="targetWeightOrMaxPull" id="targetWeight"
+                       autoComplete="off" value="targetWeight" defaultChecked={targetWeight} onChange={handleChange}/>
+                <label className="btn btn-outline-dark" htmlFor="targetWeight">Target weight</label>
+            </div>
+        </div>
+        {targetWeight && (
+            <NumberInputRow field_id="targetWeightValue" field_name="Target weight [kg]" defaultValue={10} />
+        )}
+    </>
 }
 
 function _Workout({workoutType, resetWorkout} : {
@@ -54,6 +111,8 @@ function _Workout({workoutType, resetWorkout} : {
     const [currentRep, setCurrentRep] = useState<number>(1);
     const [currentSet, setCurrentSet] = useState<number>(1);
     const [timeLeft, setTimeLeft] = useState<number>(0);
+    const [isTargetWeight, setIsTargetWeight] = useState<boolean>(false);
+    const [targetWeight, setTargetWeight] = useState<number>(0);
 
     const currentWorkoutIdRef = useRef<string | null>(null);
     const timerRef = useRef<number | null>(null);
@@ -85,6 +144,13 @@ function _Workout({workoutType, resetWorkout} : {
                 restSetsDuration: Number(formData.get("restSetsDuration")),
             };
             setRepeaterStructure(repeaterStructureRef.current)
+
+            if (formData.get("targetWeightOrMaxPull") == "targetWeight") {
+                setIsTargetWeight(true);
+                setTargetWeight(Number(formData.get("targetWeightValue")))
+            } else {
+                setIsTargetWeight(false);
+            }
         }
 
 
@@ -256,31 +322,19 @@ function _Workout({workoutType, resetWorkout} : {
                     </div>
                 </div>
             ) : (<>
-                    <Scale displayMaxWeight={workoutType == WorkoutType.PEAK_FORCE_TEST} />
+                    <Scale displayMaxWeight={workoutType == WorkoutType.PEAK_FORCE_TEST} isTargetWeight={isTargetWeight} targetWeight={targetWeight}/>
                     <div className="d-grid gap-2">
                         {phase === 'idle' ? (
                             <>
                                 <div className="card card-body bg-dark-subtle">
                                     <p>{workoutParams.workoutDescription}</p>
                                     <form onSubmit={startWorkout} className="d-grid gap-2">
-                                        <div className="mx-auto">
-                                            <div className="input-group">
-                                                <input type="radio" className="btn-check" name="arm" id="option1"
-                                                       autoComplete="off" value={WorkoutArm.LEFT} defaultChecked={true}/>
-                                                <label className="btn btn-outline-dark" style={{
-                                                    borderTopLeftRadius: "0.375em",
-                                                    borderBottomLeftRadius: "0.375em"
-                                                }} htmlFor="option1">Left arm</label>
-
-                                                <input type="radio" className="btn-check" name="arm" id="option2" autoComplete="off" value={WorkoutArm.RIGHT}/>
-                                                <label className="btn btn-outline-dark" htmlFor="option2">Right arm</label>
-
-                                                <input type="radio" className="btn-check" name="arm" id="option3" autoComplete="off" value={WorkoutArm.BOTH}/>
-                                                <label className="btn btn-outline-dark" htmlFor="option3">Both arms</label>
-                                            </div>
-                                        </div>
-                                        {workoutParams.isAssessment || <RepeaterStructureInput repeaterStructure={repeaterStructure}/>}
-                                        <button type="submit" className="btn btn-primary btn-lg py-3 fw-bold rounded-3 shadow-sm">
+                                        <InputWorkoutArm />
+                                        {workoutParams.isAssessment ||
+                                            <RepeaterStructureInput repeaterStructure={repeaterStructure}/>}
+                                        {workoutParams.isAssessment || <TargetWeightInput/>}
+                                        <button type="submit"
+                                                className="btn btn-primary btn-lg py-3 fw-bold rounded-3 shadow-sm">
                                             Start {capFirst(testOrWorkout)}
                                         </button>
                                     </form>

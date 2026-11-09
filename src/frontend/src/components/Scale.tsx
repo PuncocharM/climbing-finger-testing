@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {config} from "../config.ts";
 import axios from "axios";
 
@@ -41,8 +41,112 @@ export function resetMaxWeight() {
         .catch(e => console.error("Error sending reset max weight command: " + e));
 }
 
-export function Scale({displayMaxWeight}: {
+
+function TargetWeightSlider({currentWeight, targetWeight}: {
+    currentWeight: number,
+    targetWeight: number
+}) {
+    const margin = targetWeight * 0.05;
+    const axisMin = Math.min(targetWeight * 0.75, currentWeight - margin);
+    const axisMax = Math.max(targetWeight * 1.25, currentWeight + margin);
+    const axisSpan = axisMax - axisMin;
+
+    const toPercent = (value: number) =>
+        Math.min(100, Math.max(0, ((value - axisMin) / axisSpan) * 100));
+
+    const targetPos = toPercent(targetWeight);
+    const currentPos = toPercent(currentWeight);
+
+    const diff = currentWeight - targetWeight;
+    const onTarget = Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
+
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => axisMin + f * axisSpan);
+
+    const bootstrapColor = onTarget ? 'success' : diff > 0 ? 'danger' : 'warning';
+
+    const arrowBaseStyle: React.CSSProperties = {
+        position: 'absolute',
+        transform: 'translateX(-50%)',
+        fontSize: '1.4rem',
+        lineHeight: 1,
+    };
+
+    return (
+        <div className="mt-3 mb-2 px-3">
+            {/* Upper arrow */}
+            <div style={{position: 'relative', height: '3.2rem'}}>
+                <div className="text-info text-center"
+                     style={{...arrowBaseStyle, left: `${targetPos}%`, bottom: 0, transition: 'left 0.2s linear'}}>
+                    <div className="small fw-bold text-uppercase" style={{fontSize: '0.65rem'}}>
+                        Target {targetWeight.toFixed(2)}
+                    </div>
+                    <div>▼</div>
+                </div>
+            </div>
+
+            {/* Axis */}
+            <div className="position-relative rounded-pill bg-secondary" style={{height: '8px'}}>
+                <div
+                    className={`rounded-pill bg-${bootstrapColor}`}
+                    style={{
+                        width: `${currentPos}%`,
+                        height: '100%',
+                        transition: 'width 0.2s linear',
+                    }}
+                />
+                <div
+                    className="bg-info"
+                    style={{
+                        position: 'absolute',
+                        left: `${targetPos}%`,
+                        top: '-4px',
+                        width: '2px',
+                        height: '16px',
+                        transform: 'translateX(-50%)',
+                        transition: 'left 0.2s linear',
+                    }}
+                />
+            </div>
+
+            {/* Tick labels */}
+            <div style={{position: 'relative', height: '1.2rem'}} className="mt-1">
+                {ticks.map((t, i) => (
+                    <span key={i}
+                          className="text-light small font-monospace"
+                          style={{
+                              position: 'absolute',
+                              left: `${toPercent(t)}%`,
+                              transform: i === 0 ? 'none' : i === ticks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                              fontSize: '0.7rem',
+                          }}>
+                        {t.toFixed(2)}
+                    </span>
+                ))}
+            </div>
+
+            {/* Lower arrow */}
+            <div style={{position: 'relative', height: '3.2rem'}}>
+                <div className={`text-${bootstrapColor} text-center`}
+                     style={{
+                         ...arrowBaseStyle,
+                         left: `${currentPos}%`,
+                         top: 0,
+                         transition: 'left 0.2s linear',
+                     }}>
+                    <div>▲</div>
+                    <div className="small fw-bold text-uppercase" style={{fontSize: '0.65rem'}}>
+                        {currentWeight.toFixed(2)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function Scale({displayMaxWeight, isTargetWeight, targetWeight}: {
     displayMaxWeight: boolean,
+    isTargetWeight?: boolean,
+    targetWeight?: number
 }) {
     const [currentWeight, setCurrentWeight] = useState<number | null>(null);
     const [maxWeight, setMaxWeight] = useState<number | null>(null);
@@ -105,20 +209,30 @@ export function Scale({displayMaxWeight}: {
         }
     }
 
+    const showSlider = currentWeight != null && isTargetWeight === true && targetWeight != null && targetWeight > 0;
+    const diff = (currentWeight == null || targetWeight == null) ? 0 : currentWeight - targetWeight;
+    const onTarget = (currentWeight == null || targetWeight == null) ? false : Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
+
     return (
         <div className="bg-black border border-dark rounded-3 p-4 text-center mb-4 shadow-inner">
             <div className="row">
                 <div className={displayMaxWeight ? "col-6 border-end border-dark" : "col-12"}>
-                  <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
-                    <div className="h2 font-monospace fw-bold text-success my-2">{currentWeight ? currentWeight.toFixed(2) : "-"}</div>
+                    <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
+                    <div className={`h2 font-monospace fw-bold ${!isTargetWeight ? 'text-light' : onTarget ? 'text-success' : diff > 0 ? 'text-danger' : 'text-warning'} my-2`}>{currentWeight !== null ? currentWeight.toFixed(2) : "-"}</div>
                 </div>
                 {displayMaxWeight && (
                     <div className="col-6">
                         <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Max Weight [kg]</span>
-                        <div className="h2 font-monospace fw-bold text-warning my-2">{maxWeight ? maxWeight.toFixed(2) : "-"}</div>
+                        <div className="h2 font-monospace fw-bold text-light my-2">{maxWeight !== null ? maxWeight.toFixed(2) : "-"}</div>
                     </div>
                 )}
             </div>
+            {showSlider && (
+                <>
+                    <hr className="border-secondary my-3"/>
+                    <TargetWeightSlider currentWeight={currentWeight} targetWeight={targetWeight!}/>
+                </>
+            )}
             <hr className="border-secondary my-3"/>
             <div className="row">
                 <div className="col-6">

@@ -13,6 +13,7 @@ export const config = {
     PEAK_FORCE_PULL_DURATION: 4,
     PEAK_FORCE_REST_DURATION: 60, // 3
     PEAK_FORCE_NUMBER_SETS: 3, // 3
+    TARGET_WEIGHT_TOLERANCE: 0.02
 }
 
 export interface WorkoutParams {
