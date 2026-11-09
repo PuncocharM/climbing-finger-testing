@@ -21,13 +21,22 @@ export enum WorkoutType {
     CRITICAL_FORCE_TEST_SUSTAINED = "CRITICAL_FORCE_TEST_SUSTAINED",
     CRITICAL_FORCE_TEST_REPEATERS = "CRITICAL_FORCE_TEST_REPEATERS",
     PEAK_FORCE_TEST = "PEAK_FORCE_TEST",
-    REPEATER_WORKOUT = "REPEATER_WORKOUT",
+    WORKOUT_REPEATERS = "WORKOUT_REPEATERS",
 }
 
 export enum WorkoutArm {
     LEFT = "left",
     RIGHT = "right",
     BOTH = "both",
+}
+
+export interface RepeaterStructure {
+    countdown: number
+    pullDuration: number
+    restRepsDuration: number
+    restSetsDuration: number
+    numberReps: number
+    numberSets: number
 }
 
 export interface WorkoutSchema {

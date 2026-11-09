@@ -75,6 +75,17 @@ export default function Home(): React.JSX.Element {
                 >Run Peak Force Test (MVC)
                 </button>
               </div>
+            </div>
+            <div className="row g-2 mt-2">
+              <div className="col-6">
+                <button
+                    onClick={() => navigate("/workout-repeaters")}
+                    className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
+                >Repeater workout
+                </button>
+              </div>
+            </div>
+            <div className="row g-2 mt-2">
               <div className="col-12">
                 <button
                     onClick={() => navigate("/history")}

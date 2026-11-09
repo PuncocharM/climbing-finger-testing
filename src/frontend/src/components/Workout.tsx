@@ -3,7 +3,7 @@ import {useNavigate} from "react-router";
 import {
     generateWorkoutId,
     getPhaseStyles,
-    playBeep,
+    playBeep, type RepeaterStructure,
     sendNewWorkout,
     sendWorkoutPhase,
     WorkoutArm,
@@ -11,11 +11,38 @@ import {
     WorkoutPhaseEvent,
     WorkoutType
 } from "./workout-commons.ts";
-import {config, workoutTypeParams} from "../config.ts";
+import {defaultRepeaterStructure, workoutParamsPresets} from "../config.ts";
 import {resetMaxWeight, Scale} from "./Scale.tsx";
 import "../../styles/common.scss"
 import {ButtonHome, PageContainer, ScaleContainer} from "./utilComponents.tsx";
+import {capFirst} from "../utils.ts";
 
+
+function NumberInputRow({field_id, field_name, defaultValue}: {field_id: string, field_name: string, defaultValue: number}) {
+    return (
+        <div className="row g-3">
+            <div className="col-6">
+                <label htmlFor={field_id} className="form-label">{field_name}:</label>
+            </div>
+            <div className="col-6">
+                <input type="number" className="form-control" name={field_id} id={field_id} min={1}
+                       defaultValue={defaultValue}/>
+            </div>
+        </div>
+    )
+}
+
+
+function RepeaterStructureInput({repeaterStructure}: { repeaterStructure: RepeaterStructure }) {
+    return <>
+        <NumberInputRow field_id="numberSets" field_name="Number of sets" defaultValue={repeaterStructure.numberSets}/>
+        <NumberInputRow field_id="numberReps" field_name="Number of reps" defaultValue={repeaterStructure.numberReps}/>
+        <NumberInputRow field_id="countdown" field_name="Countdown [s]" defaultValue={repeaterStructure.countdown}/>
+        <NumberInputRow field_id="pullDuration" field_name="Pull duration [s]" defaultValue={repeaterStructure.pullDuration}/>
+        <NumberInputRow field_id="restRepsDuration" field_name="Rest between reps [s]" defaultValue={repeaterStructure.restRepsDuration}/>
+        <NumberInputRow field_id="restSetsDuration" field_name="Rest between sets [s]" defaultValue={repeaterStructure.restSetsDuration}/>
+    </>;
+}
 
 function _Workout({workoutType, resetWorkout} : {
     workoutType: WorkoutType,
@@ -24,17 +51,22 @@ function _Workout({workoutType, resetWorkout} : {
     const navigate = useNavigate();
 
     const [phase, setPhase] = useState<WorkoutPhase>(WorkoutPhase.idle);
+    const [currentRep, setCurrentRep] = useState<number>(1);
     const [currentSet, setCurrentSet] = useState<number>(1);
     const [timeLeft, setTimeLeft] = useState<number>(0);
 
     const currentWorkoutIdRef = useRef<string | null>(null);
     const timerRef = useRef<number | null>(null);
     const phaseRef = useRef<WorkoutPhase>(phase);
+    const currentRepRef = useRef<number>(currentRep);
     const currentSetRef = useRef<number>(currentSet);
     const phaseEndTimeRef = useRef<number>(0);
     const lastTriggeredSecondRef = useRef<number>(-1);
 
-    const workoutParams = workoutTypeParams(workoutType);
+    const workoutParams = workoutParamsPresets(workoutType);
+    const [repeaterStructure, setRepeaterStructure] = useState<RepeaterStructure>(workoutParams.repeaterStructure || defaultRepeaterStructure);
+    const repeaterStructureRef = useRef<RepeaterStructure>(repeaterStructure);
+    const testOrWorkout = workoutParams.isAssessment ? "test" : "workout"
 
 
     const startWorkout = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -42,6 +74,18 @@ function _Workout({workoutType, resetWorkout} : {
         const form = e.target;
         const formData = new FormData(form);
         const workoutArm = formData.get("arm") as WorkoutArm;
+
+        if (!workoutParams.isAssessment) {
+            repeaterStructureRef.current = {
+                numberSets: Number(formData.get("numberSets")),
+                numberReps: Number(formData.get("numberReps")),
+                countdown: Number(formData.get("countdown")),
+                pullDuration: Number(formData.get("pullDuration")),
+                restRepsDuration: Number(formData.get("restRepsDuration")),
+                restSetsDuration: Number(formData.get("restSetsDuration")),
+            };
+            setRepeaterStructure(repeaterStructureRef.current)
+        }
 
 
         currentWorkoutIdRef.current = generateWorkoutId(workoutParams.workoutIdPrefix);
@@ -51,12 +95,14 @@ function _Workout({workoutType, resetWorkout} : {
         const now = performance.now();
         phaseRef.current = WorkoutPhase.countdown;
         setPhase(WorkoutPhase.countdown);
+        setCurrentRep(1);
         setCurrentSet(1);
+        currentRepRef.current = 1
         currentSetRef.current = 1
 
-        setTimeLeft(config.COUNTDOWN);
-        phaseEndTimeRef.current = now + config.COUNTDOWN * 1000;
-        lastTriggeredSecondRef.current = config.COUNTDOWN;
+        setTimeLeft(repeaterStructureRef.current.countdown);
+        phaseEndTimeRef.current = now + repeaterStructureRef.current.countdown * 1000;
+        lastTriggeredSecondRef.current = repeaterStructureRef.current.countdown;
 
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -89,30 +135,49 @@ function _Workout({workoutType, resetWorkout} : {
                     setPhase(WorkoutPhase.pull);
                     sendWorkoutPhase(WorkoutPhaseEvent.PULL_START, currentWorkoutIdRef.current);
 
-                    phaseEndTimeRef.current += workoutParams.pullDuration * 1000;
-                    lastTriggeredSecondRef.current = workoutParams.pullDuration;
-                    setTimeLeft(workoutParams.pullDuration);
+                    phaseEndTimeRef.current += repeaterStructureRef.current.pullDuration * 1000;
+                    lastTriggeredSecondRef.current = repeaterStructureRef.current.pullDuration;
+                    setTimeLeft(repeaterStructureRef.current.pullDuration);
                     break;
                 case WorkoutPhase.pull:
-                    if (currentSetRef.current >= workoutParams.numberReps) {
+                    if (currentRepRef.current >= repeaterStructureRef.current.numberReps) {
+                        // finished all reps in a set
                         playBeep(1200, 1000);
-                        phaseRef.current = WorkoutPhase.finished;
-                        setPhase(WorkoutPhase.finished);
-                        sendWorkoutPhase(WorkoutPhaseEvent.WORKOUT_END, currentWorkoutIdRef.current);
+                        if (currentSetRef.current >= repeaterStructureRef.current.numberSets) {
+                            // finished all sets
+                            phaseRef.current = WorkoutPhase.finished;
+                            setPhase(WorkoutPhase.finished);
+                            sendWorkoutPhase(WorkoutPhaseEvent.WORKOUT_END, currentWorkoutIdRef.current);
 
-                        if (timerRef.current) {
-                            clearInterval(timerRef.current);
-                            timerRef.current = null;
+                            if (timerRef.current) {
+                                clearInterval(timerRef.current);
+                                timerRef.current = null;
+                            }
+                        } else {
+                            // move to the next set
+                            currentRepRef.current = 0;
+                            setCurrentRep(currentRepRef.current);
+                            currentSetRef.current += 1;
+                            setCurrentSet(currentSetRef.current);
+
+                            phaseRef.current = WorkoutPhase.rest;
+                            setPhase(WorkoutPhase.rest);
+                            sendWorkoutPhase(WorkoutPhaseEvent.REST_START, currentWorkoutIdRef.current);
+
+                            phaseEndTimeRef.current += repeaterStructureRef.current.restSetsDuration * 1000;
+                            lastTriggeredSecondRef.current = repeaterStructureRef.current.restSetsDuration;
+                            setTimeLeft(repeaterStructureRef.current.restSetsDuration);
                         }
                     } else {
+                        // move to next rep
                         playBeep(550, 400);
                         phaseRef.current = WorkoutPhase.rest;
                         setPhase(WorkoutPhase.rest);
                         sendWorkoutPhase(WorkoutPhaseEvent.REST_START, currentWorkoutIdRef.current);
 
-                        phaseEndTimeRef.current += workoutParams.restRepsDuration * 1000;
-                        lastTriggeredSecondRef.current = workoutParams.restRepsDuration;
-                        setTimeLeft(workoutParams.restRepsDuration);
+                        phaseEndTimeRef.current += repeaterStructureRef.current.restRepsDuration * 1000;
+                        lastTriggeredSecondRef.current = repeaterStructureRef.current.restRepsDuration;
+                        setTimeLeft(repeaterStructureRef.current.restRepsDuration);
                     }
                     break;
                 case WorkoutPhase.rest:
@@ -122,11 +187,11 @@ function _Workout({workoutType, resetWorkout} : {
                     setPhase(WorkoutPhase.pull);
                     sendWorkoutPhase(WorkoutPhaseEvent.PULL_START, currentWorkoutIdRef.current);
 
-                    phaseEndTimeRef.current += workoutParams.pullDuration * 1000;
-                    lastTriggeredSecondRef.current = workoutParams.pullDuration;
-                    setTimeLeft(workoutParams.pullDuration);
-                    currentSetRef.current += 1;
-                    setCurrentSet(currentSetRef.current);
+                    phaseEndTimeRef.current += repeaterStructureRef.current.pullDuration * 1000;
+                    lastTriggeredSecondRef.current = repeaterStructureRef.current.pullDuration;
+                    setTimeLeft(repeaterStructureRef.current.pullDuration);
+                    currentRepRef.current += 1;
+                    setCurrentRep(currentRepRef.current);
                     break;
                 default:
                     console.error("Unrecognized phase:", phaseRef.current);
@@ -157,8 +222,11 @@ function _Workout({workoutType, resetWorkout} : {
             {phase != 'idle' && (
                 <div className="text-center mb-3">
                     <h1 className="h4 fw-bold mb-1">{phaseStyle.title}</h1>
-                    {phase !== 'finished' && workoutParams.numberReps > 1 && (
-                        <span className="badge bg-black px-3 py-2 font-monospace fs-6">Set {currentSet} / {workoutParams.numberReps}</span>
+                    {phase !== 'finished' && repeaterStructure.numberSets > 1 && (
+                        <div><div className="badge bg-black px-3 py-2 font-monospace fs-6">Set {currentSet} / {repeaterStructure.numberSets}</div></div>
+                    )}
+                    {phase !== 'finished' && repeaterStructure.numberReps > 1 && (
+                        <div><div className="badge bg-black px-3 py-2 font-monospace fs-6">Rep {currentRep} / {repeaterStructure.numberReps}</div></div>
                     )}
                 </div>
             )}
@@ -183,7 +251,7 @@ function _Workout({workoutType, resetWorkout} : {
                             onClick={resetWorkout}
                             className="btn btn-light fw-bold px-4 py-2 w-100 shadow-sm border-0"
                         >
-                            Restart the test
+                            Restart the {testOrWorkout}
                         </button>
                     </div>
                 </div>
@@ -194,7 +262,7 @@ function _Workout({workoutType, resetWorkout} : {
                             <>
                                 <div className="card card-body bg-dark-subtle">
                                     <p>{workoutParams.workoutDescription}</p>
-                                    <form onSubmit={startWorkout} className="d-grid gap-3">
+                                    <form onSubmit={startWorkout} className="d-grid gap-2">
                                         <div className="mx-auto">
                                             <div className="input-group">
                                                 <input type="radio" className="btn-check" name="arm" id="option1"
@@ -211,8 +279,9 @@ function _Workout({workoutType, resetWorkout} : {
                                                 <label className="btn btn-outline-dark" htmlFor="option3">Both arms</label>
                                             </div>
                                         </div>
+                                        {workoutParams.isAssessment || <RepeaterStructureInput repeaterStructure={repeaterStructure}/>}
                                         <button type="submit" className="btn btn-primary btn-lg py-3 fw-bold rounded-3 shadow-sm">
-                                            Start Workout
+                                            Start {capFirst(testOrWorkout)}
                                         </button>
                                     </form>
                                 </div>
@@ -220,7 +289,7 @@ function _Workout({workoutType, resetWorkout} : {
                         ) : (
                             <button onClick={abortWorkout}
                                     className="btn btn-outline-light btn-lg py-3 fw-bold rounded-3">
-                                Abort Workout
+                                Abort {capFirst(testOrWorkout)}
                             </button>
                         )}
                     </div>
