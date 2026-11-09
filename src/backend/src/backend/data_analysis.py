@@ -8,22 +8,21 @@ import pandas as pd
 from scipy import integrate as spi, stats as sps
 
 from config import Config, log
-from persistence import database
-from persistence.database import get_test_events_by_test_id, get_test_entry_by_id
-from persistence.model import TestEntryEntity, TestEventEntity, PeakForceTestResults
-from schemas import TestType, TestEventType
+from persistence.database import WorkoutRepository, WorkoutEventRepository, PeakForceResultRepository
+from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResults
+from schemas import WorkoutType, WorkoutEventType
 
 
-def analyze_peak_force(test: TestEntryEntity, test_events: Sequence[TestEventEntity], df_data: pd.DataFrame):
+def analyze_peak_force(test: WorkoutEntity, test_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame):
     set_peaks: List[float] = []
     pull_start: datetime.datetime | None = None
     for test_event in test_events:
         timestamp = test_event.timestamp
         # timestamp = pd.to_datetime(test_event.timestamp, unit="ns")
         match test_event.event_type:
-            case TestEventType.PULL_START:
+            case WorkoutEventType.PULL_START:
                 pull_start = timestamp
-            case TestEventType.REST_START | TestEventType.TEST_END:
+            case WorkoutEventType.REST_START | WorkoutEventType.WORKOUT_END:
                 if pull_start is None:
                     log.error("Rest or End before any pull")
                     return
@@ -39,8 +38,8 @@ def analyze_peak_force(test: TestEntryEntity, test_events: Sequence[TestEventEnt
 
                 pull_start = None
 
-    pftr = PeakForceTestResults(test_id=test.test_id, set_peaks=set_peaks, max_force=max(set_peaks))
-    database.save_peak_force_result(pftr)
+    pftr = PeakForceTestResults(workout_id=test.workout_id, set_peaks=set_peaks, max_force=max(set_peaks))
+    PeakForceResultRepository.save(pftr)
 
 
 def load_data():
@@ -57,22 +56,22 @@ def process_test_analytics(test_id: str):
         time.sleep(1.5) # Allow final logging buffers to flush to disk
         df_data = load_data()
 
-        test = get_test_entry_by_id(test_id)
+        test = WorkoutRepository.get_by_id(test_id)
         if test is None:
             log.error(f"Test does not exist: {test_id}")
             return
 
-        test_events = get_test_events_by_test_id(test_id)
+        test_events = WorkoutEventRepository.get_all_by_workout_id(test_id)
 
         if len(test_events) == 0:
             log.error(f"No test events found for test {test_id}")
             return
 
-        match test.test_type:
-            case TestType.PEAK_FORCE:
+        match test.workout_type:
+            case WorkoutType.PEAK_FORCE_TEST:
                 analyze_peak_force(test, test_events, df_data)
             case _:
-                log.error(f"Unsupported test type: {test.test_type}")
+                log.error(f"Unsupported test type: {test.workout_type}")
 
     # except Exception as e:
     #     log.error(f"Unexpected error: {e}")

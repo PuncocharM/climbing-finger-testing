@@ -1,5 +1,3 @@
-"""Database persistence for TestEntry using SQLAlchemy ORM and SQLite."""
-
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -12,11 +10,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sqlite3 import Connection as SQLite3Connection
 
-from persistence.model import TestEntryEntity, Base, TestEventEntity, PeakForceTestResults
+from persistence.model import WorkoutEntity, Base, WorkoutEventEntity, PeakForceTestResults
 
 
-class DuplicateTestEntryError(Exception):
-    """Raised when saving a TestEntry whose test_id already exists."""
+class DuplicateWorkoutError(Exception):
+    """Raised when saving a Workout whose workout_id already exists."""
 
 
 _engine: Optional[Engine] = None
@@ -61,82 +59,97 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.close()
 
 
-def save_test_entry(entry: TestEntryEntity) -> TestEntryEntity:
-    """Persist a new TestEntry.
+class WorkoutRepository:
+    @staticmethod
+    def save(workout: WorkoutEntity) -> WorkoutEntity:
+        """Persist a new Workout.
 
-    Raises DuplicateTestEntryError if an entry with the same test_id exists.
-    """
-    try:
+        Raises DuplicateWorkoutError if an entry with the same workout_id exists.
+        """
+        try:
+            with _session_scope() as session:
+                session.add(workout)
+        except IntegrityError as exc:
+            raise DuplicateWorkoutError(f"A Workout with workout_id={workout.workout_id!r} already exists.") from exc
+        return workout
+
+
+    @staticmethod
+    def get_by_id(workout_id: str) -> Optional[WorkoutEntity]:
+        """Return the Workout with the given workout_id, or None if not found."""
         with _session_scope() as session:
-            session.add(entry)
-    except IntegrityError as exc:
-        raise DuplicateTestEntryError(f"A TestEntry with test_id={entry.test_id!r} already exists.") from exc
-    return entry
+            return session.get(WorkoutEntity, workout_id)
 
 
-def get_test_entry_by_id(test_id: str) -> Optional[TestEntryEntity]:
-    """Return the TestEntry with the given test_id, or None if not found."""
-    with _session_scope() as session:
-        return session.get(TestEntryEntity, test_id)
+    @staticmethod
+    def get_all() -> Sequence[WorkoutEntity]:
+        """Return all Workout rows, ordered by timestamp (oldest first)."""
+        with _session_scope() as session:
+            return session.scalars(select(WorkoutEntity).order_by(WorkoutEntity.timestamp)).all()
 
 
-def get_all_test_entries() -> Sequence[TestEntryEntity]:
-    """Return all TestEntry rows, ordered by timestamp (oldest first)."""
-    with _session_scope() as session:
-        return session.scalars(select(TestEntryEntity).order_by(TestEntryEntity.timestamp)).all()
+    @staticmethod
+    def delete(workout_id: str) -> bool:
+        """Delete the Workout with the given workout_id.
+
+        Returns True if an entry was deleted, False if none was found.
+        """
+        with _session_scope() as session:
+            workout = session.get(WorkoutEntity, workout_id)
+            if workout is None:
+                return False
+            session.delete(workout)
+            return True
 
 
-def delete_test_entry(test_id: str) -> bool:
-    """Delete the TestEntry with the given test_id.
+class WorkoutEventRepository:
+    @staticmethod
+    def save(workout_event: WorkoutEventEntity) -> WorkoutEventEntity:
+        with _session_scope() as session:
+            session.add(workout_event)
 
-    Returns True if an entry was deleted, False if none was found.
-    """
-    with _session_scope() as session:
-        entry = session.get(TestEntryEntity, test_id)
-        if entry is None:
-            return False
-        session.delete(entry)
-        return True
+        return workout_event
 
 
-def save_test_event(test_event: TestEventEntity) -> TestEventEntity:
-    with _session_scope() as session:
-        session.add(test_event)
-
-    return test_event
-
-
-def get_test_event_by_id(event_id: int) -> Optional[TestEventEntity]:
-    with _session_scope() as session:
-        return session.get(TestEventEntity, event_id)
+    @staticmethod
+    def get_by_id(event_id: int) -> Optional[WorkoutEventEntity]:
+        with _session_scope() as session:
+            return session.get(WorkoutEventEntity, event_id)
 
 
-def get_test_events_by_test_id(test_id: str) -> Sequence[TestEventEntity]:
-    with _session_scope() as session:
-        return session.scalars(select(TestEventEntity).where(TestEventEntity.test_id == test_id)).all()
+    @staticmethod
+    def get_all_by_workout_id(workout_id: str) -> Sequence[WorkoutEventEntity]:
+        with _session_scope() as session:
+            return session.scalars(select(WorkoutEventEntity).where(WorkoutEventEntity.workout_id == workout_id)).all()
 
 
-def get_all_test_events() -> Sequence[TestEventEntity]:
-    with _session_scope() as session:
-        return session.scalars(select(TestEventEntity).order_by(TestEventEntity.timestamp)).all()
+    @staticmethod
+    def get_all() -> Sequence[WorkoutEventEntity]:
+        with _session_scope() as session:
+            return session.scalars(select(WorkoutEventEntity).order_by(WorkoutEventEntity.timestamp)).all()
 
 
-def delete_test_event(event_id: int) -> bool:
-    with _session_scope() as session:
-        test_event = session.get(TestEventEntity, event_id)
-        if test_event is None:
-            return False
-        session.delete(test_event)
-        return True
+    @staticmethod
+    def delete(event_id: int) -> bool:
+        with _session_scope() as session:
+            workout_event = session.get(WorkoutEventEntity, event_id)
+            if workout_event is None:
+                return False
+            session.delete(workout_event)
+            return True
 
 
-def save_peak_force_result(peak_force_test_result: PeakForceTestResults) -> PeakForceTestResults:
-    with _session_scope() as session:
-        session.add(peak_force_test_result)
 
-    return peak_force_test_result
+class PeakForceResultRepository:
+    @staticmethod
+    def save(peak_force_test_result: PeakForceTestResults) -> PeakForceTestResults:
+        with _session_scope() as session:
+            session.add(peak_force_test_result)
+
+        return peak_force_test_result
 
 
-def get_peak_force_result(test_id: str) -> Optional[PeakForceTestResults]:
-    with _session_scope() as session:
-        return session.get(PeakForceTestResults, test_id)
+    @staticmethod
+    def get_by_id(workout_id: str) -> Optional[PeakForceTestResults]:
+        with _session_scope() as session:
+            return session.get(PeakForceTestResults, workout_id)

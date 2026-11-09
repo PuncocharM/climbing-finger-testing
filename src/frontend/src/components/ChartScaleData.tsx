@@ -11,7 +11,7 @@ import {
     Tooltip,
 } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
-import {type TestEventSchema, TestPhaseEvent, type ScaleData} from "./test-commons.ts";
+import {type WorkoutEventSchema, WorkoutPhaseEvent, type ScaleData} from "./workout-commons.ts";
 
 
 ChartJS.register(
@@ -41,7 +41,7 @@ function parseTs(ts: string) {
 const PULL_COLOR = 'rgba(239, 68, 68, 0.15)';
 const REST_COLOR = 'rgba(59, 130, 246, 0.1)';
 
-function buildBands(events: TestEventSchema[], t0: number): Band[] {
+function buildBands(events: WorkoutEventSchema[], t0: number): Band[] {
     const sortedEvents = events
         .map(e => ({t: (parseTs(e.timestamp) - t0) / 1000, type: e.event_type}))
         .sort((a, b) => a.t - b.t);
@@ -51,11 +51,11 @@ function buildBands(events: TestEventSchema[], t0: number): Band[] {
     for (let i = 0; i < sortedEvents.length - 1; i++) {
         const e1 = sortedEvents[i];
         const e2 = sortedEvents[i + 1];
-        if (e1.type == TestPhaseEvent.PULL_START || e1.type == TestPhaseEvent.REST_START) {
+        if (e1.type == WorkoutPhaseEvent.PULL_START || e1.type == WorkoutPhaseEvent.REST_START) {
             bands.push({
                 start: e1.t,
                 end: e2.t,
-                color: e1.type == TestPhaseEvent.PULL_START ? PULL_COLOR : REST_COLOR,
+                color: e1.type == WorkoutPhaseEvent.PULL_START ? PULL_COLOR : REST_COLOR,
             });
         }
     }
@@ -122,7 +122,7 @@ const chartOptions: ChartOptions<'line'> = {
 }
 
 export default function Chart({testEvents, scaleData, chartRef}: {
-    testEvents: TestEventSchema[],
+    testEvents: WorkoutEventSchema[],
     scaleData: ScaleData,
     chartRef?: React.RefObject<ChartJS<"line"> | null>
 }) {

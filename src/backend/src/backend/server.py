@@ -12,11 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import Config, log
 from data_analysis import process_test_analytics, load_data
 from esp import ESP32, serial_reader_worker
-from persistence import database
-from persistence.database import init_db, get_all_test_entries, get_test_entry_by_id, delete_test_entry, save_test_entry, \
-    DuplicateTestEntryError, save_test_event
-from persistence.model import TestEntryEntity, TestEventEntity, PeakForceTestResults
-from schemas import TestEntrySchema, TestEventSchema, Commands, TestEventType
+from persistence.database import init_db, DuplicateWorkoutError, WorkoutRepository, WorkoutEventRepository, \
+    PeakForceResultRepository
+from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResults
+from schemas import WorkoutSchema, WorkoutEventSchema, Commands, WorkoutEventType, PeakForceTestSchema
 
 
 @asynccontextmanager
@@ -79,105 +78,105 @@ async def websocket_endpoint(websocket: WebSocket):
         log.info(f"Client disconnected. Active connections: {len(connected_clients)}")
 
 
-@app.get("/api/test-entries", response_model=List[TestEntrySchema])
-def fetch_all_test_entries() -> Sequence[TestEntryEntity]:
-    return get_all_test_entries()
+@app.get("/api/workouts", response_model=List[WorkoutSchema])
+def fetch_all_workouts() -> Sequence[WorkoutEntity]:
+    return WorkoutRepository.get_all()
 
 
-@app.get("/api/test-entries/{test_id}", response_model=TestEntrySchema)
-def fetch_test_entry_by_id(test_id: str) -> TestEntryEntity:
-    test_entry_entity = get_test_entry_by_id(test_id)
-    if not test_entry_entity:
-        raise HTTPException(status_code=404, detail=f"Test entry not found {test_id}.")
+@app.get("/api/workouts/{workout_id}", response_model=WorkoutSchema)
+def fetch_workout_by_id(workout_id: str) -> WorkoutEntity:
+    workout_entity = WorkoutRepository.get_by_id(workout_id)
+    if not workout_entity:
+        raise HTTPException(status_code=404, detail=f"Workout not found {workout_id}.")
 
-    return test_entry_entity
+    return workout_entity
 
-@app.post("/api/test-entries/new")
-def create_new_test_entry(new_test_entry_request: TestEntrySchema):
+@app.post("/api/workouts/new")
+def create_new_workout(new_workout_request: WorkoutSchema):
     try:
-        tee = TestEntryEntity(**new_test_entry_request.model_dump())
+        we = WorkoutEntity(**new_workout_request.model_dump())
     except Exception as e:
-        log.error(f"Cannot convert test request to entity: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a test {new_test_entry_request.test_id}")
+        log.error(f"Cannot convert workout request to entity: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a workout {new_workout_request.workout_id}")
 
     try:
-        save_test_entry(tee)
-    except DuplicateTestEntryError as e:
-        log.error(f"Cannot save test with already existing test_it {new_test_entry_request.test_id}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a test with already existing id {new_test_entry_request.test_id}")
+        WorkoutRepository.save(we)
+    except DuplicateWorkoutError as e:
+        log.error(f"Cannot save workout with already existing workout_it {new_workout_request.workout_id}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a workout with already existing id {new_workout_request.workout_id}")
     except Exception as e:
-        log.error(f"Cannot save test {new_test_entry_request.test_id}")
-        raise HTTPException(status_code=500, detail=f"Cannot save the test")
+        log.error(f"Cannot save workout {new_workout_request.workout_id}")
+        raise HTTPException(status_code=500, detail=f"Cannot save the workout")
 
-    log.info(f"[{new_test_entry_request.timestamp}] Recorded new test: {new_test_entry_request.test_id}")
+    log.info(f"[{new_workout_request.timestamp}] Recorded new workout: {new_workout_request.workout_id}")
     return {"status": "success"}
 
 
-@app.delete("/api/test-entries/{test_id}")
-def delete_test_entry(test_id: str):
-    success = delete_test_entry(test_id)
+@app.delete("/api/workouts/{workout_id}")
+def delete_workout(workout_id: str):
+    success = WorkoutRepository.delete(workout_id)
     if not success:
         raise HTTPException(
             status_code=404,
-            detail="The requested evaluation entry could not be found or was already removed."
+            detail="The requested workout could not be found or was already removed."
         )
-    log.info(f"[{test_id}] Test removed from database.")
-    return {"status": "deleted", "test_id": test_id}
+    log.info(f"[{workout_id}] Workout removed from database.")
+    return {"status": "deleted", "workout_id": workout_id}
 
 
-@app.post("/api/test-entries/{test_id}/test-events/new")
-async def log_test_event(test_id: str, test_event: TestEventSchema, background_tasks: BackgroundTasks):
+@app.post("/api/workouts/{workout_id}/workout-events/new")
+async def log_workout_event(workout_id: str, workout_event: WorkoutEventSchema, background_tasks: BackgroundTasks):
     try:
-        te = TestEventEntity(test_id=test_id, **test_event.model_dump())
+        te = WorkoutEventEntity(workout_id=workout_id, **workout_event.model_dump())
     except Exception as e:
-        log.error(f"Cannot convert test event request to entity: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a test event {test_event}")
+        log.error(f"Cannot convert workout event request to entity: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Cannot create a workout event {workout_event}")
 
     try:
-        save_test_event(te)
+        WorkoutEventRepository.save(te)
     except Exception as e:
-        log.error(f"Cannot save test event: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Cannot save the test")
+        log.error(f"Cannot save workout event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cannot save the workout event")
 
-    if test_event.event_type == TestEventType.TEST_END:
-        background_tasks.add_task(process_test_analytics, test_id)
+    if workout_event.event_type == WorkoutEventType.WORKOUT_END:
+        background_tasks.add_task(process_test_analytics, workout_id)
 
-    log.info(f"[{test_event.timestamp}] Recorded frontend event: {test_event.event_type}")
+    log.info(f"[{workout_event.timestamp}] Recorded frontend event: {workout_event.event_type}")
     return {"status": "success"}
 
 
-@app.get("/api/test-entries/{test_id}/test-events", response_model=List[TestEventSchema])
-def fetch_test_events(test_id: str) -> Sequence[TestEventEntity]:
-    return database.get_test_events_by_test_id(test_id)
+@app.get("/api/workouts/{workout_id}/workout-events", response_model=List[WorkoutEventSchema])
+def fetch_workout_events(workout_id: str) -> Sequence[WorkoutEventEntity]:
+    return WorkoutEventRepository.get_all_by_workout_id(workout_id)
 
 
-@app.get("/api/test-entries/{test_id}/scale-data")
-def fetch_scale_data(test_id: str):
-    test_events = database.get_test_events_by_test_id(test_id)
-    if len(test_events) == 0:
-        log.error(f"No test events for test {test_id}")
-        raise HTTPException(status_code=400, detail=f"No test events for test {test_id}")
+@app.get("/api/workouts/{workout_id}/scale-data")
+def fetch_scale_data(workout_id: str):
+    workout_events = WorkoutEventRepository.get_all_by_workout_id(workout_id)
+    if len(workout_events) == 0:
+        log.error(f"No workout events for workout {workout_id}")
+        raise HTTPException(status_code=400, detail=f"No workout events for workout {workout_id}")
 
-    timestamps = [te.timestamp for te in test_events]
-    test_start = min(timestamps)
-    test_end = max(timestamps)
+    timestamps = [te.timestamp for te in workout_events]
+    workout_start = min(timestamps)
+    workout_end = max(timestamps)
 
     df_data = load_data()
 
-    df_data_test = df_data[test_start:test_end]
+    df_data_workout = df_data[workout_start:workout_end]
 
     return {
-        "timestamps": df_data_test.index.to_list(),
-        "weights": df_data_test["weight"].to_list(),
-        "max_weights": df_data_test["max_weight"].to_list(),
+        "timestamps": df_data_workout.index.to_list(),
+        "weights": df_data_workout["weight"].to_list(),
+        "max_weights": df_data_workout["max_weight"].to_list(),
     }
 
 
-@app.get("/api/test-entries/{test_id}/test-results-peak-force")
-def fetch_test_results_peak_force(test_id: str) -> PeakForceTestResults:
-    result = database.get_peak_force_result(test_id)
+@app.get("/api/workouts/{workout_id}/test-results-peak-force", response_model=PeakForceTestSchema)
+def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResults:
+    result = PeakForceResultRepository.get_by_id(workout_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Test results not found for test {test_id}")
+        raise HTTPException(status_code=404, detail=f"Test results not found for workout {workout_id}")
     return result
 
 

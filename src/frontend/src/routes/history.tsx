@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import "../../styles/common.scss"
 import axios from "axios";
-import type {TestSchema} from "../components/test-commons.ts";
+import type {WorkoutSchema} from "../components/workout-commons.ts";
 import {config} from "../config.ts";
 import {ButtonHome, ErrorCard, LoadingSpinner, PageContainer} from "../components/utilComponents.tsx";
 
 export default function TestingHistory(): React.JSX.Element {
     const navigate = useNavigate();
 
-    const [tests, setTests] = useState<TestSchema[]>([]);
+    const [tests, setTests] = useState<WorkoutSchema[]>([]);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function TestingHistory(): React.JSX.Element {
     function fetchPastTests() {
         setLoading(true);
         setError(null);
-        axios.get<TestSchema[]>(config.apiEndpoint + "/test-entries")
+        axios.get<WorkoutSchema[]>(config.apiEndpoint + "/workouts")
             .then(r => {
                 setTests(r.data);
             })
@@ -38,7 +38,7 @@ export default function TestingHistory(): React.JSX.Element {
         const confirmed = window.confirm(`Are you sure you want to permanently delete test record ${testId}? This operation cannot be undone.`);
         if (!confirmed) return;
 
-        axios.delete(`${config.apiEndpoint}/test-entries/${testId}`)
+        axios.delete(`${config.apiEndpoint}/workouts/${testId}`)
             .then(() => {
                 fetchPastTests()
             })
@@ -48,7 +48,7 @@ export default function TestingHistory(): React.JSX.Element {
     };
 
     const filteredTests = tests.filter((test) => {
-        const matchId = test.test_id.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchId = test.workout_id.toLowerCase().includes(searchQuery.toLowerCase());
         const matchDate = test.timestamp.toLowerCase().includes(searchQuery.toLowerCase());
         return matchId || matchDate;
     });
@@ -124,32 +124,32 @@ export default function TestingHistory(): React.JSX.Element {
                                 </tr>
                                 </thead>
                                 <tbody className="border-top-0">
-                                {filteredTests.map((test) => (
+                                {filteredTests.map((workout) => (
                                     <tr
-                                        key={test.test_id}
+                                        key={workout.workout_id}
                                     >
                                         <td className="ps-4 py-3 fw-semibold font-monospace small text-emerald-400">
-                                            {formatDisplayDate(test.timestamp)}
+                                            {formatDisplayDate(workout.timestamp)}
                                         </td>
                                         <td className="py-3 text-center fw-bold text-warning font-monospace">
-                                            {test.test_id}
+                                            {workout.workout_id}
                                         </td>
                                         <td className="py-3 text-center font-monospace small">
-                                            {test.test_type.replace("_", " ")}
+                                            {workout.workout_type.replaceAll("_", " ")}
                                         </td>
                                         <td className="py-3 text-center fw-bold text-success font-monospace">
-                                            {test.test_arm}
+                                            {workout.workout_arm}
                                         </td>
                                         <td className="pe-4 py-3 text-end">
                                             <div className="d-inline-flex gap-2">
                                                 <button
-                                                    onClick={() => navigate(`/test-results/${test.test_id}`)}
+                                                    onClick={() => navigate(`/test-results/${workout.workout_id}`)}
                                                     className="btn btn-sm btn-outline-info rounded-pill px-3"
                                                 >
                                                     View
                                                 </button>
                                                 <button
-                                                    onClick={(e) => handleTestDeletion(e, test.test_id)}
+                                                    onClick={(e) => handleTestDeletion(e, workout.workout_id)}
                                                     className="btn btn-sm btn-outline-danger rounded-pill px-2"
                                                     title="Delete this record"
                                                 >

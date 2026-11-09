@@ -1,8 +1,8 @@
 import "../../styles/common.scss"
-import {Test} from "../components/Test.tsx";
-import {TestType} from "../components/test-commons.ts";
+import {Workout} from "../components/Workout.tsx";
+import {WorkoutType} from "../components/workout-commons.ts";
 
 
 export default function CriticalForceTestRepeatersRoute() {
-    return <Test testType={TestType.CRITICAL_FORCE_SUSTAINED}/>
+    return <Workout workoutType={WorkoutType.CRITICAL_FORCE_TEST_SUSTAINED}/>
 }

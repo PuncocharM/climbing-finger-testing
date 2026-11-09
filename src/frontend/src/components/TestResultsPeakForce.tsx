@@ -17,7 +17,7 @@ export function TestResultsPeakForce({testId}: { testId: string }) {
         setLoading(true);
         setError(null);
 
-        axios.get<PeakForceTestResult>(`${config.apiEndpoint}/test-entries/${testId}/test-results-peak-force`)
+        axios.get<PeakForceTestResult>(`${config.apiEndpoint}/workouts/${testId}/test-results-peak-force`)
             .then(r => {
                 setTestResults(r.data)
             })

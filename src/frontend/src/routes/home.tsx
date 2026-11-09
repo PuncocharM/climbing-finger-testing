@@ -79,7 +79,7 @@ export default function Home(): React.JSX.Element {
                 <button
                     onClick={() => navigate("/history")}
                     className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
-                >View past tests
+                >View Past Tests & Workouts
                 </button>
               </div>
             </div>

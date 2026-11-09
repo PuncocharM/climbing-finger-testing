@@ -1,4 +1,4 @@
-import {TestType} from "./components/test-commons.ts";
+import {WorkoutType} from "./components/workout-commons.ts";
 
 export const config = {
     webSocketEndpoint: 'ws://localhost:8000/ws',
@@ -15,44 +15,62 @@ export const config = {
     PEAK_FORCE_NUMBER_SETS: 3, // 3
 }
 
-export interface TestParams {
-    testIdPrefix: string;
-    testTitle: string;
-    testSubtitle?: string;
-    testDescription?: string;
-    pullDuration: number;
-    restDuration: number;
-    numberSets: number;
+export interface WorkoutParams {
+    workoutIdPrefix: string
+    workoutTitle: string
+    workoutSubtitle?: string
+    workoutDescription?: string
+    pullDuration: number
+    restRepsDuration: number
+    restSetsDuration: number
+    numberReps: number
+    numberSets: number
+    isAssessment: boolean
+    targetWeight: number | null
 }
 
-export function testTypeParams(testType: TestType): TestParams {
-    switch (testType) {
-        case TestType.CRITICAL_FORCE_REPEATERS:
+export function workoutTypeParams(workoutType: WorkoutType): WorkoutParams {
+    switch (workoutType) {
+        case WorkoutType.CRITICAL_FORCE_TEST_REPEATERS:
             return {
-                testIdPrefix: 'TEST_CF_S_',
-                testTitle: 'Critical Force Test',
-                testSubtitle: '7:3 repeaters',
+                isAssessment: true,
+                workoutIdPrefix: 'TEST_CF_S_',
+                workoutTitle: 'Critical Force Test',
+                workoutSubtitle: '7:3 repeaters',
                 pullDuration: config.REPEATER_PULL_DURATION,
-                restDuration: config.REPEATER_REST_DURATION,
-                numberSets: config.REPEATERS_SETS,
-            }
-        case TestType.CRITICAL_FORCE_SUSTAINED:
-            return {
-                testIdPrefix: 'TEST_CF_R_',
-                testTitle: 'Critical Force Test',
-                testSubtitle: 'Sustained pull',
-                pullDuration: config.CRITICAL_FORCE_SUSTAIN_DURATION,
-                restDuration: 0,
+                restRepsDuration: config.REPEATER_REST_DURATION,
+                numberReps: config.REPEATERS_SETS,
                 numberSets: 1,
+                restSetsDuration: 0,
+                targetWeight: null,
             }
-        case TestType.PEAK_FORCE:
+        case WorkoutType.CRITICAL_FORCE_TEST_SUSTAINED:
             return {
-                testIdPrefix: 'TEST_PF_',
-                testTitle: 'Peak Force Test',
-                testDescription: "Warm up to ~80% of expected maximum and take 3-5 minutes rest. Each pull build force over 1-2 seconds.",
-                pullDuration: config.PEAK_FORCE_PULL_DURATION,
-                restDuration: config.PEAK_FORCE_REST_DURATION,
-                numberSets: config.PEAK_FORCE_NUMBER_SETS,
+                isAssessment: true,
+                workoutIdPrefix: 'TEST_CF_R_',
+                workoutTitle: 'Critical Force Test',
+                workoutSubtitle: 'Sustained pull',
+                pullDuration: config.CRITICAL_FORCE_SUSTAIN_DURATION,
+                numberReps: 1,
+                numberSets: 1,
+                restRepsDuration: 0,
+                restSetsDuration: 0,
+                targetWeight: null,
             }
+        case WorkoutType.PEAK_FORCE_TEST:
+            return {
+                isAssessment: true,
+                workoutIdPrefix: 'TEST_PF_',
+                workoutTitle: 'Peak Force Test',
+                workoutDescription: "Warm up to ~80% of expected maximum and take 3-5 minutes rest. Each pull build force over 1-2 seconds.",
+                pullDuration: config.PEAK_FORCE_PULL_DURATION,
+                restRepsDuration: config.PEAK_FORCE_REST_DURATION,
+                numberReps: config.PEAK_FORCE_NUMBER_SETS,
+                numberSets: 1,
+                restSetsDuration: 0,
+                targetWeight: null,
+            }
+        default:
+            throw new Error(`Unknown workout type ${workoutType}`)
     }
 }

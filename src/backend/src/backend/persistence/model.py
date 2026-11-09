@@ -6,39 +6,39 @@ from typing import Sequence, Optional
 from sqlalchemy import String, DateTime, Enum, ForeignKey, Integer, TypeDecorator, Float
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
-from schemas import TestArm, TestType, TestEventType
+from schemas import WorkoutArm, WorkoutType, WorkoutEventType
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class TestEntryEntity(Base):
-    __tablename__ = "test_entries"
+class WorkoutEntity(Base):
+    __tablename__ = "workouts"
     __test__ = False  # keep pytest from trying to collect this class
 
-    test_id: Mapped[str] = mapped_column(String, primary_key=True)
+    workout_id: Mapped[str] = mapped_column(String, primary_key=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    test_type: Mapped[TestType] = mapped_column(Enum(TestType), nullable=False)
-    test_arm: Mapped[TestArm] = mapped_column(Enum(TestArm), nullable=False)
+    workout_type: Mapped[WorkoutType] = mapped_column(Enum(WorkoutType), nullable=False)
+    workout_arm: Mapped[WorkoutArm] = mapped_column(Enum(WorkoutArm), nullable=False)
 
     def __repr__(self) -> str:
         return (
-            f"TestEntry(test_id={self.test_id!r}, "
+            f"Workout(workout_id={self.workout_id!r}, "
             f"timestamp={self.timestamp!r}, "
-            f"test_type={self.test_type!r}, "
-            f"test_arm={self.test_arm!r})"
+            f"workout_type={self.workout_type!r}, "
+            f"workout_arm={self.workout_arm!r})"
         )
 
 
-class TestEventEntity(Base):
-    __tablename__ = "test_events"
+class WorkoutEventEntity(Base):
+    __tablename__ = "workout_events"
     __test__ = False
 
     event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    test_id: Mapped[str] = mapped_column(String, ForeignKey('test_entries.test_id', ondelete="CASCADE"), nullable=False)
+    workout_id: Mapped[str] = mapped_column(String, ForeignKey('workouts.workout_id', ondelete="CASCADE"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    event_type: Mapped[TestEventType] = mapped_column(Enum(TestEventType), nullable=False)
+    event_type: Mapped[WorkoutEventType] = mapped_column(Enum(WorkoutEventType), nullable=False)
 
 
 class FloatList(TypeDecorator):
@@ -60,6 +60,6 @@ class PeakForceTestResults(Base):
     __tablename__ = "peak_force_test_results"
     __test__ = False
 
-    test_id: Mapped[str] = mapped_column(String, ForeignKey('test_entries.test_id', ondelete="CASCADE"), primary_key=True, nullable=False)
+    workout_id: Mapped[str] = mapped_column(String, ForeignKey('workouts.workout_id', ondelete="CASCADE"), primary_key=True, nullable=False)
     set_peaks: Mapped[Sequence[float]] = mapped_column(FloatList, nullable=False)
     max_force: Mapped[float] = mapped_column(Float, nullable=False)

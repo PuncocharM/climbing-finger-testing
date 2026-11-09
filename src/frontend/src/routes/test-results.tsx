@@ -11,18 +11,18 @@ import {
     LoadingSpinner,
     PageContainer
 } from "../components/utilComponents.tsx";
-import {type ScaleData, type TestEventSchema, type TestSchema, TestType} from "../components/test-commons.ts";
+import {type ScaleData, type WorkoutEventSchema, type WorkoutSchema, WorkoutType} from "../components/workout-commons.ts";
 import {config} from "../config.ts";
 
-import Chart from "../components/ChartTestData.tsx";
+import Chart from "../components/ChartScaleData.tsx";
 import {TestResultsPeakForce} from "../components/TestResultsPeakForce.tsx";
 
 
 export default function TestResults() {
     const { testId } = useParams<{ testId: string }>();
 
-    const [testEntry, setTestEntry] = useState<TestSchema | null>(null);
-    const [testEvents, setTestEvents] = useState<TestEventSchema[]>([]);
+    const [testEntry, setTestEntry] = useState<WorkoutSchema | null>(null);
+    const [testEvents, setTestEvents] = useState<WorkoutEventSchema[]>([]);
     const [scaleData, setScaleData] = useState<ScaleData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -34,9 +34,9 @@ export default function TestResults() {
         setError(null);
 
         Promise.all([
-            axios.get<TestSchema>(`${config.apiEndpoint}/test-entries/${testId}`),
-            axios.get<TestEventSchema[]>(`${config.apiEndpoint}/test-entries/${testId}/test-events`),
-            axios.get<ScaleData>(`${config.apiEndpoint}/test-entries/${testId}/scale-data`),
+            axios.get<WorkoutSchema>(`${config.apiEndpoint}/workouts/${testId}`),
+            axios.get<WorkoutEventSchema[]>(`${config.apiEndpoint}/workouts/${testId}/workout-events`),
+            axios.get<ScaleData>(`${config.apiEndpoint}/workouts/${testId}/scale-data`),
         ])
             .then(([entryRes, eventsRes, scaleRes]) => {
                 setTestEntry(entryRes.data);
@@ -87,10 +87,10 @@ export default function TestResults() {
                 <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-2">
                     <div className="mb-4">
                         <h1 className="h3 fw-bold m-0">Test results</h1>
-                        <div className="font-monospace small">ID: {testEntry.test_id}</div>
-                        <div className="font-monospace small"><span className="text-capitalize">{testEntry.test_arm}</span> arm</div>
+                        <div className="font-monospace small">ID: {testEntry.workout_id}</div>
+                        <div className="font-monospace small"><span className="text-capitalize">{testEntry.workout_arm}</span> arm</div>
                         {
-                            testEntry.test_type == TestType.PEAK_FORCE && <TestResultsPeakForce testId={testEntry.test_id} />
+                            testEntry.workout_type == WorkoutType.PEAK_FORCE_TEST && <TestResultsPeakForce testId={testEntry.workout_id} />
                         }
                     </div>
                     {hasData && (
