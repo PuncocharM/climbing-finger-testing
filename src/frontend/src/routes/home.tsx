@@ -84,6 +84,13 @@ export default function Home(): React.JSX.Element {
                 >Repeater workout
                 </button>
               </div>
+              <div className="col-6">
+                <button
+                    onClick={() => navigate("/workout-target-weight")}
+                    className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
+                >Target weight workout
+                </button>
+              </div>
             </div>
             <div className="row g-2 mt-2">
               <div className="col-12">

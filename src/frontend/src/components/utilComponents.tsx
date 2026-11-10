@@ -9,7 +9,7 @@ export function PageContainer({children}: { children: React.ReactNode }) {
 }
 
 export function ScaleContainer({children, bgStyle, style}: {
-    children: React.ReactNode,
+    children?: React.ReactNode,
     bgStyle?: string,
     style?: object
 }) {
@@ -41,7 +41,7 @@ export function ButtonHome() {
 }
 
 export function ButtonBackToTests() {
-    return <ButtonBack path="/history" title="Back to all tests" />
+    return <ButtonBack path="/history" title="Back to All Workouts" />
 }
 
 export function LoadingSpinner() {
@@ -57,4 +57,23 @@ export function ErrorCard({title, error}: {title: string, error: string}) {
         <h3 className="h5 fw-bold mb-2">{title}</h3>
         <p className="small opacity-75 mb-4">{error}</p>
     </div>;
+}
+
+export function NumberInputRow({field_id, field_name, defaultValue, onChange}: {
+    field_id: string,
+    field_name: string,
+    defaultValue: number,
+    onChange?: any
+}) {
+    return (
+        <div className="row g-3">
+            <div className="col-6">
+                <label htmlFor={field_id} className="form-label">{field_name}:</label>
+            </div>
+            <div className="col-6">
+                <input type="number" className="form-control" name={field_id} id={field_id} min={1}
+                       defaultValue={defaultValue} onChange={onChange}/>
+            </div>
+        </div>
+    )
 }

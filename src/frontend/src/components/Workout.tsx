@@ -3,7 +3,8 @@ import {useNavigate} from "react-router";
 import {
     generateWorkoutId,
     getPhaseStyles,
-    playBeep, type RepeaterStructure,
+    playBeep,
+    type RepeaterStructure,
     sendNewWorkout,
     sendWorkoutPhase,
     WorkoutArm,
@@ -14,7 +15,7 @@ import {
 import {defaultRepeaterStructure, workoutParamsPresets} from "../config.ts";
 import {resetMaxWeight, Scale} from "./Scale.tsx";
 import "../../styles/common.scss"
-import {ButtonHome, PageContainer, ScaleContainer} from "./utilComponents.tsx";
+import {ButtonHome, NumberInputRow, PageContainer, ScaleContainer} from "./utilComponents.tsx";
 import {capFirst} from "../utils.ts";
 
 
@@ -41,20 +42,6 @@ function InputWorkoutArm() {
     )
 }
 
-
-function NumberInputRow({field_id, field_name, defaultValue}: {field_id: string, field_name: string, defaultValue: number}) {
-    return (
-        <div className="row g-3">
-            <div className="col-6">
-                <label htmlFor={field_id} className="form-label">{field_name}:</label>
-            </div>
-            <div className="col-6">
-                <input type="number" className="form-control" name={field_id} id={field_id} min={1}
-                       defaultValue={defaultValue}/>
-            </div>
-        </div>
-    )
-}
 
 function RepeaterStructureInput({repeaterStructure}: { repeaterStructure: RepeaterStructure }) {
     return <>
@@ -111,8 +98,7 @@ function _Workout({workoutType, resetWorkout} : {
     const [currentRep, setCurrentRep] = useState<number>(1);
     const [currentSet, setCurrentSet] = useState<number>(1);
     const [timeLeft, setTimeLeft] = useState<number>(0);
-    const [isTargetWeight, setIsTargetWeight] = useState<boolean>(false);
-    const [targetWeight, setTargetWeight] = useState<number>(0);
+    const [targetWeight, setTargetWeight] = useState<number | null>(null);
 
     const currentWorkoutIdRef = useRef<string | null>(null);
     const timerRef = useRef<number | null>(null);
@@ -146,10 +132,9 @@ function _Workout({workoutType, resetWorkout} : {
             setRepeaterStructure(repeaterStructureRef.current)
 
             if (formData.get("targetWeightOrMaxPull") == "targetWeight") {
-                setIsTargetWeight(true);
                 setTargetWeight(Number(formData.get("targetWeightValue")))
             } else {
-                setIsTargetWeight(false);
+                setTargetWeight(null)
             }
         }
 
@@ -322,7 +307,7 @@ function _Workout({workoutType, resetWorkout} : {
                     </div>
                 </div>
             ) : (<>
-                    <Scale displayMaxWeight={workoutType == WorkoutType.PEAK_FORCE_TEST} isTargetWeight={isTargetWeight} targetWeight={targetWeight}/>
+                    <Scale displayMaxWeight={workoutType == WorkoutType.PEAK_FORCE_TEST} targetWeight={targetWeight}/>
                     <div className="d-grid gap-2">
                         {phase === 'idle' ? (
                             <>

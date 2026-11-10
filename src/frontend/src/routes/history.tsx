@@ -89,7 +89,7 @@ export default function TestingHistory(): React.JSX.Element {
 
                 <div
                     className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
-                    <h1 className="h3 fw-bold text-light m-0">Test Log History</h1>
+                    <h1 className="h3 fw-bold text-light m-0">Workout Log History</h1>
                 </div>
 
                 <div className="mb-4">
@@ -117,9 +117,9 @@ export default function TestingHistory(): React.JSX.Element {
                                 <thead className="table-light text-uppercase tracking-wider small">
                                 <tr>
                                     <th className="ps-4 py-3">Date & Time</th>
-                                    <th className="py-3 text-center">Test Id</th>
-                                    <th className="py-3 text-center">Test type</th>
-                                    <th className="py-3 text-center">Test arm</th>
+                                    <th className="py-3 text-center">Workout Id</th>
+                                    <th className="py-3 text-center">Workout type</th>
+                                    <th className="py-3 text-center">Worked arm</th>
                                     <th className="pe-4 py-3 text-end">Actions</th>
                                 </tr>
                                 </thead>

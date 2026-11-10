@@ -143,10 +143,9 @@ function TargetWeightSlider({currentWeight, targetWeight}: {
     );
 }
 
-export function Scale({displayMaxWeight, isTargetWeight, targetWeight}: {
+export function Scale({displayMaxWeight, targetWeight}: {
     displayMaxWeight: boolean,
-    isTargetWeight?: boolean,
-    targetWeight?: number
+    targetWeight?: number | null
 }) {
     const [currentWeight, setCurrentWeight] = useState<number | null>(null);
     const [maxWeight, setMaxWeight] = useState<number | null>(null);
@@ -209,7 +208,7 @@ export function Scale({displayMaxWeight, isTargetWeight, targetWeight}: {
         }
     }
 
-    const showSlider = currentWeight != null && isTargetWeight === true && targetWeight != null && targetWeight > 0;
+    const showSlider = currentWeight != null && targetWeight != null && targetWeight > 0;
     const diff = (currentWeight == null || targetWeight == null) ? 0 : currentWeight - targetWeight;
     const onTarget = (currentWeight == null || targetWeight == null) ? false : Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
 
@@ -218,7 +217,7 @@ export function Scale({displayMaxWeight, isTargetWeight, targetWeight}: {
             <div className="row">
                 <div className={displayMaxWeight ? "col-6 border-end border-dark" : "col-12"}>
                     <span className="text-uppercase tracking-wider text-light small fw-bold d-block mb-1">Live Weight [kg]</span>
-                    <div className={`h2 font-monospace fw-bold ${!isTargetWeight ? 'text-light' : onTarget ? 'text-success' : diff > 0 ? 'text-danger' : 'text-warning'} my-2`}>{currentWeight !== null ? currentWeight.toFixed(2) : "-"}</div>
+                    <div className={`h2 font-monospace fw-bold ${!showSlider ? 'text-light' : onTarget ? 'text-success' : diff > 0 ? 'text-danger' : 'text-warning'} my-2`}>{currentWeight !== null ? currentWeight.toFixed(2) : "-"}</div>
                 </div>
                 {displayMaxWeight && (
                     <div className="col-6">
