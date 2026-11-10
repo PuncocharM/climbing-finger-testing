@@ -54,3 +54,8 @@ class Commands(StrEnum):
 class PeakForceTestSchema(BaseModel):
     set_peaks: List[float]
     max_force: float
+
+class CriticalForceTestSchema(BaseModel):
+    set_averages: List[float]
+    critical_force: float
+    w_prime: float

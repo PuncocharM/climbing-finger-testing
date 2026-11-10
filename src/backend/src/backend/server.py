@@ -10,12 +10,13 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Back
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import Config, log
-from data_analysis import process_test_analytics, load_data
+from data_analysis import process_workout_analytics, load_data
 from esp import ESP32, serial_reader_worker
-from persistence.database import init_db, DuplicateWorkoutError, WorkoutRepository, WorkoutEventRepository, \
-    PeakForceResultRepository
-from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResults
-from schemas import WorkoutSchema, WorkoutEventSchema, Commands, WorkoutEventType, PeakForceTestSchema
+from persistence.database import init_db, DuplicateEntryError, WorkoutRepository, WorkoutEventRepository, \
+    PeakForceResultRepository, CriticalForceResultRepository
+from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
+from schemas import WorkoutSchema, WorkoutEventSchema, Commands, WorkoutEventType, PeakForceTestSchema, \
+    CriticalForceTestSchema
 
 
 @asynccontextmanager
@@ -101,7 +102,7 @@ def create_new_workout(new_workout_request: WorkoutSchema):
 
     try:
         WorkoutRepository.save(we)
-    except DuplicateWorkoutError as e:
+    except DuplicateEntryError as e:
         log.error(f"Cannot save workout with already existing workout_it {new_workout_request.workout_id}")
         raise HTTPException(status_code=400, detail=f"Cannot create a workout with already existing id {new_workout_request.workout_id}")
     except Exception as e:
@@ -139,7 +140,9 @@ async def log_workout_event(workout_id: str, workout_event: WorkoutEventSchema, 
         raise HTTPException(status_code=500, detail=f"Cannot save the workout event")
 
     if workout_event.event_type == WorkoutEventType.WORKOUT_END:
-        background_tasks.add_task(process_test_analytics, workout_id)
+        background_tasks.add_task(process_workout_analytics, workout_id)
+    elif workout_event.event_type == WorkoutEventType.WORKOUT_ABORT:
+        WorkoutRepository.delete(workout_id)
 
     log.info(f"[{workout_event.timestamp}] Recorded frontend event: {workout_event.event_type}")
     return {"status": "success"}
@@ -173,8 +176,16 @@ def fetch_scale_data(workout_id: str):
 
 
 @app.get("/api/workouts/{workout_id}/test-results-peak-force", response_model=PeakForceTestSchema)
-def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResults:
+def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResult:
     result = PeakForceResultRepository.get_by_id(workout_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Test results not found for workout {workout_id}")
+    return result
+
+
+@app.get("/api/workouts/{workout_id}/test-results-critical-force", response_model=CriticalForceTestSchema)
+def fetch_test_results_critical_force(workout_id: str) -> CriticalForceTestResult:
+    result = CriticalForceResultRepository.get_by_id(workout_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Test results not found for workout {workout_id}")
     return result

@@ -56,10 +56,20 @@ class FloatList(TypeDecorator):
         return list(map(float, value.split(",")))
 
 
-class PeakForceTestResults(Base):
+class PeakForceTestResult(Base):
     __tablename__ = "peak_force_test_results"
     __test__ = False
 
     workout_id: Mapped[str] = mapped_column(String, ForeignKey('workouts.workout_id', ondelete="CASCADE"), primary_key=True, nullable=False)
     set_peaks: Mapped[Sequence[float]] = mapped_column(FloatList, nullable=False)
     max_force: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class CriticalForceTestResult(Base):
+    __tablename__ = "critical_force_test_results"
+    __test__ = False
+
+    workout_id: Mapped[str] = mapped_column(String, ForeignKey('workouts.workout_id', ondelete="CASCADE"), primary_key=True, nullable=False)
+    set_averages: Mapped[Sequence[float]] = mapped_column(FloatList, nullable=False)
+    critical_force: Mapped[float] = mapped_column(Float, nullable=False)
+    w_prime: Mapped[float] = mapped_column(Float, nullable=False)

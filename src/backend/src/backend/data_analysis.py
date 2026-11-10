@@ -1,45 +1,15 @@
 import datetime
-import json
-import sqlite3
 import time
-from typing import Sequence, List
+from typing import Sequence, List, Callable
 
+import numpy as np
 import pandas as pd
-from scipy import integrate as spi, stats as sps
 
 from config import Config, log
-from persistence.database import WorkoutRepository, WorkoutEventRepository, PeakForceResultRepository
-from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResults
+from persistence.database import WorkoutRepository, WorkoutEventRepository, PeakForceResultRepository, \
+    CriticalForceResultRepository
+from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
 from schemas import WorkoutType, WorkoutEventType
-
-
-def analyze_peak_force(test: WorkoutEntity, test_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame):
-    set_peaks: List[float] = []
-    pull_start: datetime.datetime | None = None
-    for test_event in test_events:
-        timestamp = test_event.timestamp
-        # timestamp = pd.to_datetime(test_event.timestamp, unit="ns")
-        match test_event.event_type:
-            case WorkoutEventType.PULL_START:
-                pull_start = timestamp
-            case WorkoutEventType.REST_START | WorkoutEventType.WORKOUT_END:
-                if pull_start is None:
-                    log.error("Rest or End before any pull")
-                    return
-
-
-                pull_data = df_data.loc[pull_start:timestamp, "weight"]
-                if len(pull_data) == 0:
-                    log.error(f"No data in the pull interval")
-                    return
-                else:
-                    peak = float(pull_data.max())
-                    set_peaks.append(peak)
-
-                pull_start = None
-
-    pftr = PeakForceTestResults(workout_id=test.workout_id, set_peaks=set_peaks, max_force=max(set_peaks))
-    PeakForceResultRepository.save(pftr)
 
 
 def load_data():
@@ -50,96 +20,85 @@ def load_data():
     return df_data
 
 
-
-def process_test_analytics(test_id: str):
-    # try:
-        time.sleep(1.5) # Allow final logging buffers to flush to disk
-        df_data = load_data()
-
-        test = WorkoutRepository.get_by_id(test_id)
-        if test is None:
-            log.error(f"Test does not exist: {test_id}")
-            return
-
-        test_events = WorkoutEventRepository.get_all_by_workout_id(test_id)
-
-        if len(test_events) == 0:
-            log.error(f"No test events found for test {test_id}")
-            return
-
-        match test.workout_type:
-            case WorkoutType.PEAK_FORCE_TEST:
-                analyze_peak_force(test, test_events, df_data)
-            case _:
-                log.error(f"Unsupported test type: {test.workout_type}")
-
-    # except Exception as e:
-    #     log.error(f"Unexpected error: {e}")
+def aggregate_sets(workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame, f: Callable) -> List[float] | None:
+    set_aggregates: List[float] = []
+    pull_start: datetime.datetime | None = None
+    for workout_event in workout_events:
+        timestamp = workout_event.timestamp
+        match workout_event.event_type:
+            case WorkoutEventType.PULL_START:
+                pull_start = timestamp
+            case WorkoutEventType.REST_START | WorkoutEventType.WORKOUT_END:
+                if pull_start is None:
+                    log.error("Rest or End before any pull")
+                    return None
 
 
-    #     # Locate individual phase transition boundaries
-    #     set_peaks = []
-    #     cumulative_work = []
-    #     cumulative_time = []
-    #
-    #     total_work_done = 0.0
-    #     total_time_seconds = 0.0
-    #
-    #     pull_start = None
-    #     for timestamp, event_row in df_events_test.iterrows():
-    #         event = event_row["event"]
-    #         if event == "PULL_START":
-    #             pull_start = timestamp
-    #         elif event == "REST_START" or event == "TEST_END":
-    #             pull_data = df_data.loc[(df_data.index >= pull_start) & (df_data.index < timestamp), "weight"]
-    #
-    #             if len(pull_data) > 0:
-    #                 peak = float(pull_data.max())
-    #                 set_peaks.append(peak)
-    #
-    #                 # Compute Work (Impulse) via linear trapezoidal integration modeling
-    #                 set_work = float(spi.trapezoid(pull_data.values, dx=(1.0 / 80.0)))
-    #                 total_work_done += set_work
-    #                 # TODO: make the timestamp difference
-    #                 total_time_seconds += 7.0 # Standard work block time allocation
-    #
-    #                 cumulative_work.append(total_work_done)
-    #                 cumulative_time.append(total_time_seconds)
-    #             else:
-    #                 print(f"No data in the pull interval {pull_start}, {timestamp}")
-    #
-    #     if len(cumulative_work) < 2:
-    #         print("Not enough cumulative work")
-    #         print(set_peaks, cumulative_work, cumulative_time)
-    #         print(df_events_test)
-    #         print(df_data)
-    #         return # Insufficient data to execute reliable linear regressions
-    #
-    #     # Execute Monod-Scherrer Linear Model Mapping
-    #     # Cumulative Work = (Critical Force * Cumulative Time) + W'
-    #     slope, intercept, r_value, p_value, std_err = sps.linregress(cumulative_time, cumulative_work)
-    #
-    #     # Save metrics directly into SQLite
-    #     save_analytics(
-    #         test_id=test_id,
-    #         test_type="CRITICAL_FORCE_7_3",
-    #         cf=round(slope, 2),
-    #         w_prime=round(intercept, 2),
-    #         r_sq=round(r_value**2, 4),
-    #         peaks_list=set_peaks
-    #     )
-    #     print(f"Successfully processed analytics for {test_id}. CF: {round(slope,2)}kg, W': {round(intercept,2)}J")
-    # except Exception as e:
-    #     print(f"Error executing mathematical analytics engine processing: {str(e)}")
-#
-#
-# def save_analytics(test_id, test_type, cf, w_prime, r_sq, peaks_list):
-#     conn = sqlite3.connect(Config.DB_FILE)
-#     cursor = conn.cursor()
-#     cursor.execute("""
-#         INSERT OR REPLACE INTO test_results
-#         (test_id, timestamp, test_type, critical_force_kg, w_prime_joules, r_squared, set_peaks_json)
-#         VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
-#     """, (test_id, test_type, cf, w_prime, r_sq, json.dumps(peaks_list)))
-#     conn.commit()
-#     conn.close()
+                pull_data = df_data.loc[pull_start + datetime.timedelta(seconds=1) : timestamp - datetime.timedelta(seconds=1), "weight"]
+                if len(pull_data) == 0:
+                    log.error(f"No data in the pull interval")
+                    return None
+                else:
+                    set_aggregates.append(f(pull_data))
+
+                pull_start = None
+
+    return set_aggregates
+
+
+def integrate_w_prime(pull_data: pd.Series, critical_force: float):
+    x = pull_data.index.diff()[1:].total_seconds()
+    y = (pull_data-critical_force)[1:]
+    return np.dot(x, y)
+
+def analyze_cf_repeaters(workout: WorkoutEntity, workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame):
+    set_medians = aggregate_sets(workout_events, df_data, f=lambda x: np.median(x))
+    if set_medians is None:
+        return
+
+    if len(set_medians) < 6:
+        log.error("Less than 6 sets")
+        return
+
+    critical_force = float(np.mean(set_medians[-6:]))
+    w_prime_elements = aggregate_sets(workout_events, df_data, f=lambda x: integrate_w_prime(x, critical_force))
+    if w_prime_elements is None:
+        return
+    w_prime = sum(w_prime_elements)
+    cftr = CriticalForceTestResult(workout_id=workout.workout_id, set_averages=set_medians, critical_force=critical_force, w_prime=w_prime)
+    CriticalForceResultRepository.save(cftr)
+
+
+def analyze_peak_force_test(workout: WorkoutEntity, workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame):
+    set_peaks = aggregate_sets(workout_events, df_data, f=lambda x: np.max(x))
+    if set_peaks is None:
+        return
+
+    max_force = max(set_peaks)
+    pftr = PeakForceTestResult(workout_id=workout.workout_id, set_peaks=set_peaks, max_force=max_force)
+    PeakForceResultRepository.save(pftr)
+
+
+def process_workout_analytics(workout_id: str):
+    time.sleep(1.5) # Allow final logging buffers to flush to disk
+    df_data = load_data()
+
+    workout = WorkoutRepository.get_by_id(workout_id)
+    if workout is None:
+        log.error(f"Workout does not exist: {workout_id}")
+        return
+
+    workout_events = WorkoutEventRepository.get_all_by_workout_id(workout_id)
+    workout_events = list(sorted(workout_events, key=lambda e: e.timestamp))
+
+    if len(workout_events) == 0:
+        log.error(f"No workout events found for workout {workout_id}")
+        return
+
+    match workout.workout_type:
+        case WorkoutType.PEAK_FORCE_TEST:
+            analyze_peak_force_test(workout, workout_events, df_data)
+        case WorkoutType.CRITICAL_FORCE_TEST_REPEATERS:
+            analyze_cf_repeaters(workout, workout_events, df_data)
+        case _:
+            log.error(f"Unsupported workout type: {workout.workout_type}")

@@ -15,7 +15,7 @@ import {type ScaleData, type WorkoutEventSchema, type WorkoutSchema, WorkoutType
 import {config} from "../config.ts";
 
 import Chart from "../components/ChartScaleData.tsx";
-import {TestResultsPeakForce} from "../components/TestResultsPeakForce.tsx";
+import {TestResultsCriticalForce, TestResultsPeakForce} from "../components/TestResults.tsx";
 
 
 export default function TestResults() {
@@ -89,9 +89,8 @@ export default function TestResults() {
                         <h1 className="h3 fw-bold m-0">Test results</h1>
                         <div className="font-monospace small">ID: {testEntry.workout_id}</div>
                         <div className="font-monospace small"><span className="text-capitalize">{testEntry.workout_arm}</span> arm</div>
-                        {
-                            testEntry.workout_type == WorkoutType.PEAK_FORCE_TEST && <TestResultsPeakForce testId={testEntry.workout_id} />
-                        }
+                        {testEntry.workout_type == WorkoutType.PEAK_FORCE_TEST && <TestResultsPeakForce testId={testEntry.workout_id} />}
+                        {testEntry.workout_type == WorkoutType.CRITICAL_FORCE_TEST_REPEATERS && <TestResultsCriticalForce testId={testEntry.workout_id} />}
                     </div>
                     {hasData && (
                         <div className="btn-group btn-group-sm  mt-auto mb-0" role="group" aria-label="Chart zoom controls">

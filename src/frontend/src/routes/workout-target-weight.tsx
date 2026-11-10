@@ -1,6 +1,7 @@
 import {ButtonHome, NumberInputRow, PageContainer, ScaleContainer} from "../components/utilComponents.tsx";
 import React, {useState} from "react";
 import {Scale} from "../components/Scale.tsx";
+import "../../styles/common.scss"
 
 
 export default function WorkoutTargetWeight(){
