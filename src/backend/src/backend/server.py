@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Sequence, List
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import Config, log
@@ -14,13 +14,13 @@ from data_analysis import process_workout_analytics, load_data
 from esp import ESP32, serial_reader_worker
 from persistence.database import init_db, DuplicateEntryError, WorkoutRepository, WorkoutEventRepository, \
     PeakForceResultRepository, CriticalForceResultRepository
-from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
+from persistence.models import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
 from schemas import WorkoutSchema, WorkoutEventSchema, Commands, WorkoutEventType, PeakForceTestSchema, \
     CriticalForceTestSchema
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     esp32 = ESP32()
     connected_clients: set[WebSocket] = set()
 
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 
     yield {'esp32': esp32, 'connected_clients': connected_clients}
 
-app = FastAPI(lifespan=lifespan, title="ESP32 Load Cell Telemetry Server")
+app = FastAPI(lifespan=lifespan, title="Finger force sensor server")
 app.frontend('/', directory=Config.STATIC_DIRECTORY, fallback="index.html")
 app.add_middleware(
     CORSMiddleware,
@@ -49,10 +49,10 @@ async def broadcast_data_stream(esp32: ESP32, connected_clients: set[WebSocket])
     while True:
         if connected_clients:
             payload = {
-                "timestamp": esp32.get_timestamp(),
-                "current_weight": esp32.get_current_weight(),
-                "max_weight": esp32.get_max_weight(),
-                "status": esp32.get_connection_status()
+                "timestamp": esp32.timestamp,
+                "current_weight": esp32.current_weight,
+                "max_weight": esp32.max_weight,
+                "status": esp32.connection_status,
             }
 
             await asyncio.gather(
@@ -88,7 +88,7 @@ def fetch_all_workouts() -> Sequence[WorkoutEntity]:
 def fetch_workout_by_id(workout_id: str) -> WorkoutEntity:
     workout_entity = WorkoutRepository.get_by_id(workout_id)
     if not workout_entity:
-        raise HTTPException(status_code=404, detail=f"Workout not found {workout_id}.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Workout not found {workout_id}.")
 
     return workout_entity
 
@@ -98,16 +98,16 @@ def create_new_workout(new_workout_request: WorkoutSchema):
         we = WorkoutEntity(**new_workout_request.model_dump())
     except Exception as e:
         log.error(f"Cannot convert workout request to entity: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a workout {new_workout_request.workout_id}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot create a workout {new_workout_request.workout_id}")
 
     try:
         WorkoutRepository.save(we)
     except DuplicateEntryError as e:
         log.error(f"Cannot save workout with already existing workout_it {new_workout_request.workout_id}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a workout with already existing id {new_workout_request.workout_id}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot create a workout with already existing id {new_workout_request.workout_id}")
     except Exception as e:
         log.error(f"Cannot save workout {new_workout_request.workout_id}")
-        raise HTTPException(status_code=500, detail=f"Cannot save the workout")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Cannot save the workout")
 
     log.info(f"[{new_workout_request.timestamp}] Recorded new workout: {new_workout_request.workout_id}")
     return {"status": "success"}
@@ -118,8 +118,8 @@ def delete_workout(workout_id: str):
     success = WorkoutRepository.delete(workout_id)
     if not success:
         raise HTTPException(
-            status_code=404,
-            detail="The requested workout could not be found or was already removed."
+            status.HTTP_404_NOT_FOUND,
+            "The requested workout could not be found or was already removed."
         )
     log.info(f"[{workout_id}] Workout removed from database.")
     return {"status": "deleted", "workout_id": workout_id}
@@ -131,13 +131,13 @@ async def log_workout_event(workout_id: str, workout_event: WorkoutEventSchema, 
         te = WorkoutEventEntity(workout_id=workout_id, **workout_event.model_dump())
     except Exception as e:
         log.error(f"Cannot convert workout event request to entity: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Cannot create a workout event {workout_event}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot create a workout event {workout_event}")
 
     try:
         WorkoutEventRepository.save(te)
     except Exception as e:
         log.error(f"Cannot save workout event: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Cannot save the workout event")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Cannot save the workout event")
 
     if workout_event.event_type == WorkoutEventType.WORKOUT_END:
         background_tasks.add_task(process_workout_analytics, workout_id)
@@ -158,7 +158,7 @@ def fetch_scale_data(workout_id: str):
     workout_events = WorkoutEventRepository.get_all_by_workout_id(workout_id)
     if len(workout_events) == 0:
         log.error(f"No workout events for workout {workout_id}")
-        raise HTTPException(status_code=400, detail=f"No workout events for workout {workout_id}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No workout events for workout {workout_id}")
 
     timestamps = [te.timestamp for te in workout_events]
     workout_start = min(timestamps)
@@ -179,7 +179,7 @@ def fetch_scale_data(workout_id: str):
 def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResult:
     result = PeakForceResultRepository.get_by_id(workout_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Test results not found for workout {workout_id}")
+        raise HTTPException(status.HTTP_404_BAD_REQUEST, f"Test results not found for workout {workout_id}")
     return result
 
 
@@ -187,15 +187,15 @@ def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResult:
 def fetch_test_results_critical_force(workout_id: str) -> CriticalForceTestResult:
     result = CriticalForceResultRepository.get_by_id(workout_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Test results not found for workout {workout_id}")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Test results not found for workout {workout_id}")
     return result
 
 
 
 def _send_command(command: str, esp32: ESP32):
-    ser = esp32.get_ser()
+    ser = esp32.ser
     if ser is None or not ser.is_open:
-        raise HTTPException(status_code=503, detail="Serial port to ESP32 is not open.")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Serial port to ESP32 is not open.")
 
     try:
         ser.write(f"{command}\n".encode("utf-8"))
@@ -204,7 +204,7 @@ def _send_command(command: str, esp32: ESP32):
             "message": f"Command sent to ESP32.",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to transmit command: {str(e)}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Failed to transmit command: {str(e)}")
 
 
 @app.post("/api/command/calibrate")

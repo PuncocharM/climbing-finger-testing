@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sqlite3 import Connection as SQLite3Connection
 
-from persistence.model import WorkoutEntity, Base, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
+from persistence.models import WorkoutEntity, Base, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
 
 
 class DuplicateEntryError(Exception):
-    """Raised when saving a Workout whose workout_id already exists."""
+    """Raised when saving an Entry which already exists with the same primary key."""
 
 
 _engine: Optional[Engine] = None
@@ -51,7 +51,8 @@ def _session_scope() -> Iterator[Session]:
 
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, connection_record):
-    """Enforce a foreign key constraints in SQLite database
+    """
+    Enforce a foreign key constraints in SQLite database
     """
     if isinstance(dbapi_connection, SQLite3Connection):
         cursor = dbapi_connection.cursor()
@@ -60,8 +61,8 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 E = TypeVar('E')
-ID = TypeVar('ID')
-class Repository(Generic[E, ID]):
+PK = TypeVar('PK')
+class Repository(Generic[E, PK]):
     t: type[object]
 
     @staticmethod
@@ -75,12 +76,12 @@ class Repository(Generic[E, ID]):
         return entry
 
     @classmethod
-    def get_by_id(cls, pk: ID) -> Optional[E]:
+    def get_by_id(cls, pk: PK) -> Optional[E]:
         with _session_scope() as session:
             return session.get(cls.t, pk)
 
     @classmethod
-    def delete(cls, pk: ID) -> bool:
+    def delete(cls, pk: PK) -> bool:
         """
         Returns True if an entry was deleted, False if none was found.
         """

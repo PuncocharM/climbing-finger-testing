@@ -8,7 +8,7 @@ import pandas as pd
 from config import Config, log
 from persistence.database import WorkoutRepository, WorkoutEventRepository, PeakForceResultRepository, \
     CriticalForceResultRepository
-from persistence.model import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
+from persistence.models import WorkoutEntity, WorkoutEventEntity, PeakForceTestResult, CriticalForceTestResult
 from schemas import WorkoutType, WorkoutEventType
 
 

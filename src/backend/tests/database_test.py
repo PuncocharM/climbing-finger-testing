@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from persistence import database
 from persistence.database import init_db
-from persistence.model import WorkoutEntity, WorkoutArm, WorkoutEventEntity, PeakForceTestResult, \
+from persistence.models import WorkoutEntity, WorkoutArm, WorkoutEventEntity, PeakForceTestResult, \
     CriticalForceTestResult
 from schemas import WorkoutType, WorkoutEventType
 
