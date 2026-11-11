@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import sys
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -217,20 +215,3 @@ def calibrate(request: Request, weight: float):
 def send_command(request: Request, cmd: Commands):
     return _send_command(cmd, request.state.esp32)
 
-
-if __name__ == "__main__":
-    import uvicorn
-
-    logging.basicConfig(level=logging.INFO)
-
-    if len(sys.argv) > 1:
-        try:
-            port = int(sys.argv[1])
-        except ValueError:
-            print('Error: port has to be an integer')
-            exit(1)
-    else:
-        port = Config.DEFAULT_PORT
-
-
-    uvicorn.run(app, host="0.0.0.0", port=port)
