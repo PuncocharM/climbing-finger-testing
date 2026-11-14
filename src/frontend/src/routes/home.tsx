@@ -1,14 +1,24 @@
 import {useNavigate} from "react-router";
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
 import {resetMaxWeight, Scale, sendCalibrate, sendCommand} from "../components/Scale.tsx";
-import React from "react";
+import React, {useState} from "react";
 import "../../styles/common.scss"
 import {PageContainer, ScaleContainer} from "../components/utilComponents.tsx";
 
 export default function Home(): React.JSX.Element {
   const navigate = useNavigate();
+  const [useTargetWeight, setUseTargetWeight] = useState<boolean>(false);
+  const [targetWeight, setTargetWeight] = useState<number>(1);
 
 
+
+  const handleToggleUseTargetWeight = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUseTargetWeight(e.target.checked);
+  }
+
+  const handleChangeTargetWeight = (e: React.ChangeEvent<HTMLInputElement>)=> {
+    setTargetWeight(Number(e.currentTarget.value));
+  }
 
   function submitCalibrate(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,7 +40,7 @@ export default function Home(): React.JSX.Element {
         <PageContainer>
           <ScaleContainer>
 
-            <Scale displayMaxWeight={true} />
+            <Scale displayMaxWeight={true} targetWeight={useTargetWeight ? targetWeight : null} />
 
             <div className="row g-2 mb-2">
               <div className="col-4">
@@ -52,6 +62,26 @@ export default function Home(): React.JSX.Element {
                 </button>
               </div>
             </div>
+
+            <form onSubmit={(e) => e.preventDefault()}>
+              <div className="row g-2 mt-2">
+                <div className="col-6">
+                  <input type="checkbox" className="btn-check" id="btn-target-weight" autoComplete="off"
+                         name="useTargetWeight" onChange={handleToggleUseTargetWeight} />
+                  <label className="btn btn-outline-light" htmlFor="btn-target-weight">Use Target Weight</label>
+                </div>
+                {useTargetWeight &&
+                  <div className="col-6">
+                    <div className="input-group">
+                      <input  type="number" className="form-control" name="targetWeight" id="targetWeight" min={0}
+                            defaultValue={targetWeight} onChange={handleChangeTargetWeight}/>
+                      <span className="input-group-text">kg</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </form>
+
 
             <div className="row g-2 mt-2">
               <div className="col-6">
@@ -82,13 +112,6 @@ export default function Home(): React.JSX.Element {
                     onClick={() => navigate("/workout-repeaters")}
                     className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
                 >Repeater workout
-                </button>
-              </div>
-              <div className="col-6">
-                <button
-                    onClick={() => navigate("/workout-target-weight")}
-                    className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
-                >Target weight workout
                 </button>
               </div>
             </div>

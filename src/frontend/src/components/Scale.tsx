@@ -208,7 +208,7 @@ export function Scale({displayMaxWeight, targetWeight}: {
         }
     }
 
-    const showSlider = currentWeight != null && targetWeight != null && targetWeight > 0;
+    const showSlider = currentWeight != null && targetWeight != null && targetWeight >= 0;
     const diff = (currentWeight == null || targetWeight == null) ? 0 : currentWeight - targetWeight;
     const onTarget = (currentWeight == null || targetWeight == null) ? false : Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
 
