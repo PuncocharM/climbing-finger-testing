@@ -1,15 +1,38 @@
 import {useNavigate} from "react-router";
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
 import {resetMaxWeight, Scale, sendCalibrate, sendCommand} from "../components/Scale.tsx";
-import React, {useState} from "react";
+import React, {useRef, useState} from "react";
 import "../../styles/common.scss"
 import {PageContainer, ScaleContainer} from "../components/utilComponents.tsx";
+import {playBeep} from "../components/workout-commons.ts";
 
 export default function Home(): React.JSX.Element {
   const navigate = useNavigate();
   const [useTargetWeight, setUseTargetWeight] = useState<boolean>(false);
   const [targetWeight, setTargetWeight] = useState<number>(1);
+  const metronomeRef = useRef<number>(0)
 
+
+  const stopMetronome = () => {
+    if (metronomeRef.current > 0) {
+      clearInterval(metronomeRef.current);
+      metronomeRef.current = 0;
+    }
+  }
+
+  const metronomeBeat = () => {
+    playBeep(440, 200)
+  }
+
+  const handleToggleUseMetronome = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+        stopMetronome()
+        metronomeBeat()
+        metronomeRef.current = window.setInterval(metronomeBeat, 1000);
+      } else {
+        stopMetronome()
+      }
+  }
 
 
   const handleToggleUseTargetWeight = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,6 +42,8 @@ export default function Home(): React.JSX.Element {
   const handleChangeTargetWeight = (e: React.ChangeEvent<HTMLInputElement>)=> {
     setTargetWeight(Number(e.currentTarget.value));
   }
+
+
 
   function submitCalibrate(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -81,6 +106,14 @@ export default function Home(): React.JSX.Element {
                 }
               </div>
             </form>
+
+            <div className="row g-2 mt-2">
+              <div className="col-6">
+                <input type="checkbox" className="btn-check" id="btn-metronome" autoComplete="off"
+                       name="useMetronome" onChange={handleToggleUseMetronome} />
+                <label className="btn btn-outline-light" htmlFor="btn-metronome">Play Click</label>
+              </div>
+            </div>
 
 
             <div className="row g-2 mt-2">
