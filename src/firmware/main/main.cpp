@@ -9,14 +9,12 @@ constexpr int BAUD = 115200;
 constexpr int LOADCELL_DOUT_PIN = 16;
 constexpr int LOADCELL_SCK_PIN = 4;
 constexpr float DEFAULT_CALIBRATION_FACTOR = -21593.0;
-constexpr unsigned long TRANSMISSION_INTERVAL = 1000 / 10; // Stream data every 100ms (10Hz)
 constexpr int DELAY_AFTER_TARE = 500;
 constexpr int CALIBRATE_VALUES_TO_AVERAGE = 10;
 constexpr int OUTPUT_DECIMAL_PLACES = 5;
 
 static HX711 scale;
 static bool is_streaming = true;
-static unsigned long last_transmission_time = 0;
 static constexpr float MAX_WEIGHT_DEFAULT = std::numeric_limits<float>::lowest();
 static float maxWeight = MAX_WEIGHT_DEFAULT;
 
@@ -26,6 +24,7 @@ void setup() {
     scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
     scale.set_scale(DEFAULT_CALIBRATION_FACTOR);
     scale.tare();
+    delay(DELAY_AFTER_TARE);
 }
 
 void loop() {
@@ -59,24 +58,16 @@ void loop() {
         }
     }
 
+    if (is_streaming && scale.is_ready()) {
+        const float weight = scale.get_units();
 
-    const unsigned long now = millis();
-    if (is_streaming && (now - last_transmission_time >= TRANSMISSION_INTERVAL)) {
-        last_transmission_time = now;
-
-        if (scale.is_ready()) {
-            const float weight = scale.get_units();
-
-            if (weight > maxWeight) {
-                maxWeight = weight;
-            }
-
-            Serial.print("DATA:CURRENT_WEIGHT_MAX_WEIGHT:");
-            Serial.print(weight, OUTPUT_DECIMAL_PLACES);
-            Serial.print(":");
-            Serial.println(maxWeight, OUTPUT_DECIMAL_PLACES);
-        } else {
-            Serial.println("ERROR:SCALE_NOT_FOUND");
+        if (weight > maxWeight) {
+            maxWeight = weight;
         }
+
+        Serial.print("DATA:CURRENT_WEIGHT_MAX_WEIGHT:");
+        Serial.print(weight, OUTPUT_DECIMAL_PLACES);
+        Serial.print(":");
+        Serial.println(maxWeight, OUTPUT_DECIMAL_PLACES);
     }
 }
