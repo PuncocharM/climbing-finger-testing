@@ -24,10 +24,12 @@ class WorkoutEntity(Base):
 
     def __repr__(self) -> str:
         return (
-            f"Workout(workout_id={self.workout_id!r}, "
+            f"WorkoutEntity("
+            f"workout_id={self.workout_id!r}, "
             f"timestamp={self.timestamp!r}, "
             f"workout_type={self.workout_type!r}, "
-            f"workout_arm={self.workout_arm!r})"
+            f"workout_arm={self.workout_arm!r}"
+            ")"
         )
 
 
@@ -39,6 +41,16 @@ class WorkoutEventEntity(Base):
     workout_id: Mapped[str] = mapped_column(String, ForeignKey('workouts.workout_id', ondelete="CASCADE"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     event_type: Mapped[WorkoutEventType] = mapped_column(Enum(WorkoutEventType), nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"WorkoutEventEntity("
+            f"event_id={self.event_id!r}, "
+            f"workout_id={self.workout_id!r}, "
+            f"timestamp={self.timestamp!r}, "
+            f"event_type={self.event_type!r}"
+            ")"
+        )
 
 
 class FloatList(TypeDecorator):
@@ -64,6 +76,15 @@ class PeakForceTestResult(Base):
     set_peaks: Mapped[Sequence[float]] = mapped_column(FloatList, nullable=False)
     max_force: Mapped[float] = mapped_column(Float, nullable=False)
 
+    def __repr__(self) -> str:
+        return (
+            f"PeakForceTestResult("
+            f"workout_id={self.workout_id!r}, "
+            f"set_peaks={self.set_peaks!r}, "
+            f"max_force={self.max_force!r}"
+            ")"
+        )
+
 
 class CriticalForceTestResult(Base):
     __tablename__ = "critical_force_test_results"
@@ -73,3 +94,13 @@ class CriticalForceTestResult(Base):
     set_averages: Mapped[Sequence[float]] = mapped_column(FloatList, nullable=False)
     critical_force: Mapped[float] = mapped_column(Float, nullable=False)
     w_prime: Mapped[float] = mapped_column(Float, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"CriticalForceTestResult("
+            f"workout_id={self.workout_id!r}, "
+            f"set_averages={self.set_averages!r}, "
+            f"critical_force={self.critical_force!r}, "
+            f"w_prime={self.w_prime!r}"
+            ")"
+        )

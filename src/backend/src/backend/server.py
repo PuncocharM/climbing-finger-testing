@@ -177,7 +177,7 @@ def fetch_scale_data(workout_id: str):
 def fetch_test_results_peak_force(workout_id: str) -> PeakForceTestResult:
     result = PeakForceResultRepository.get_by_id(workout_id)
     if result is None:
-        raise HTTPException(status.HTTP_404_BAD_REQUEST, f"Test results not found for workout {workout_id}")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Test results not found for workout {workout_id}")
     return result
 
 
@@ -187,7 +187,6 @@ def fetch_test_results_critical_force(workout_id: str) -> CriticalForceTestResul
     if result is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Test results not found for workout {workout_id}")
     return result
-
 
 
 def _send_command(command: str, esp32: ESP32):
@@ -210,8 +209,6 @@ def calibrate(request: Request, weight: float):
     return _send_command(f"calibrate {weight}", request.state.esp32)
 
 
-
 @app.post("/api/command/{cmd}")
 def send_command(request: Request, cmd: Commands):
     return _send_command(cmd, request.state.esp32)
-

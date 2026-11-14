@@ -71,7 +71,7 @@ class Repository(Generic[E, PK]):
             with _session_scope() as session:
                 session.add(entry)
         except IntegrityError as exc:
-            raise DuplicateEntryError(f"An entry with the same id already exists") from exc
+            raise DuplicateEntryError(f"An entry with the same id already exists {entry}") from exc
 
         return entry
 

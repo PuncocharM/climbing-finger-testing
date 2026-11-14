@@ -14,13 +14,13 @@ from schemas import WorkoutType, WorkoutEventType
 
 def load_data():
     df_data = pd.read_csv(Config.LOG_FILE_DATA, names=["timestamp", "weight", "max_weight", "status"])
-    df_data['timestamp'] = pd.to_datetime(df_data['timestamp']) \
+    df_data['timestamp'] = pd.to_datetime(df_data['timestamp'], format="ISO8601") \
         .dt.tz_localize(None)
     df_data = df_data.set_index("timestamp")
     return df_data
 
 
-def aggregate_sets(workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame, f: Callable) -> List[float] | None:
+def aggregate_sets(workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame, f: Callable, trim_interval=0) -> List[float] | None:
     set_aggregates: List[float] = []
     pull_start: datetime.datetime | None = None
     for workout_event in workout_events:
@@ -34,7 +34,7 @@ def aggregate_sets(workout_events: Sequence[WorkoutEventEntity], df_data: pd.Dat
                     return None
 
 
-                pull_data = df_data.loc[pull_start + datetime.timedelta(seconds=1) : timestamp - datetime.timedelta(seconds=1), "weight"]
+                pull_data = df_data.loc[pull_start + datetime.timedelta(seconds=trim_interval) : timestamp - datetime.timedelta(seconds=trim_interval), "weight"]
                 if len(pull_data) == 0:
                     log.error(f"No data in the pull interval")
                     return None
@@ -52,7 +52,7 @@ def integrate_w_prime(pull_data: pd.Series, critical_force: float):
     return np.dot(x, y)
 
 def analyze_cf_repeaters(workout: WorkoutEntity, workout_events: Sequence[WorkoutEventEntity], df_data: pd.DataFrame):
-    set_medians = aggregate_sets(workout_events, df_data, f=lambda x: np.median(x))
+    set_medians = aggregate_sets(workout_events, df_data, f=lambda x: np.median(x), trim_interval=1)
     if set_medians is None:
         return
 
