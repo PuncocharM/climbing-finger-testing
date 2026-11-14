@@ -6,6 +6,12 @@ import "../../styles/common.scss"
 import {PageContainer, ScaleContainer} from "../components/utilComponents.tsx";
 import {playBeep} from "../components/workout-commons.ts";
 
+export const MetronomeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
+      <path fill="currentColor" d="m12 1.75l-3.43.92l-4.51 16.86c-.03.15-.06.31-.06.47c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2c0-.16-.03-.32-.06-.47l-1.36-5.11L17 16l.2 1h-3.79l2.84-2.84l-1.41-1.41L10.59 17H6.8l3.49-13h3.42l1.46 5.43l1.63-1.64l-1.37-5.12zM11.25 5v9.75l1.5-1.5V5zm8.54 2.8l-2.83 2.83l-.71-.71l-1.41 1.42l2.82 2.82l1.42-1.41l-.71-.71l2.83-2.83z"/>
+    </svg>
+);
+
 export default function Home(): React.JSX.Element {
   const navigate = useNavigate();
   const [useTargetWeight, setUseTargetWeight] = useState<boolean>(false);
@@ -93,7 +99,7 @@ export default function Home(): React.JSX.Element {
                 <div className="col-6">
                   <input type="checkbox" className="btn-check" id="btn-target-weight" autoComplete="off"
                          name="useTargetWeight" onChange={handleToggleUseTargetWeight} />
-                  <label className="btn btn-outline-light" htmlFor="btn-target-weight">Use Target Weight</label>
+                  <label className="btn btn-outline-light" htmlFor="btn-target-weight"><i className="bi bi-bullseye"></i> Use Target Weight</label>
                 </div>
                 {useTargetWeight &&
                   <div className="col-6">
@@ -111,7 +117,8 @@ export default function Home(): React.JSX.Element {
               <div className="col-6">
                 <input type="checkbox" className="btn-check" id="btn-metronome" autoComplete="off"
                        name="useMetronome" onChange={handleToggleUseMetronome} />
-                <label className="btn btn-outline-light" htmlFor="btn-metronome">Play Click</label>
+                <label className="btn btn-outline-light" htmlFor="btn-metronome">
+                  <MetronomeIcon /> Play Click</label>
               </div>
             </div>
 
@@ -153,7 +160,7 @@ export default function Home(): React.JSX.Element {
                 <button
                     onClick={() => navigate("/history")}
                     className="btn btn-outline-light w-100 py-2 fw-bold rounded-3"
-                >View Past Tests & Workouts
+                ><i className="bi bi-journal-text"></i> View Past Tests & Workouts
                 </button>
               </div>
             </div>
