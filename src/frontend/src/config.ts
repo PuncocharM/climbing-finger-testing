@@ -24,6 +24,7 @@ export interface WorkoutParams {
     workoutSubtitle?: string
     workoutDescription?: string
     repeaterStructure?: RepeaterStructure
+    customizableFields: Array<keyof RepeaterStructure>
 }
 
 export const defaultRepeaterStructure: RepeaterStructure = {
@@ -52,6 +53,7 @@ export function workoutParamsPresets(workoutType: WorkoutType): WorkoutParams {
                     numberSets: 1,
                     restSetsDuration: 0,
                 },
+                customizableFields: ["countdown"],
             }
         case WorkoutType.CRITICAL_FORCE_TEST_SUSTAINED:
             return {
@@ -68,6 +70,7 @@ export function workoutParamsPresets(workoutType: WorkoutType): WorkoutParams {
                     restRepsDuration: 0,
                     restSetsDuration: 0,
                 },
+                customizableFields: ["countdown"],
             }
         case WorkoutType.PEAK_FORCE_TEST:
             return {
@@ -84,6 +87,7 @@ export function workoutParamsPresets(workoutType: WorkoutType): WorkoutParams {
                     numberSets: 1,
                     restSetsDuration: 0,
                 },
+                customizableFields: ["countdown", "numberReps", "restRepsDuration", "pullDuration"]
             }
         case WorkoutType.WORKOUT_REPEATERS:
             return {
@@ -91,6 +95,7 @@ export function workoutParamsPresets(workoutType: WorkoutType): WorkoutParams {
                 isMaxPull: false,
                 workoutIdPrefix: 'WORKOUT_R_',
                 workoutTitle: 'Repeaters Workout',
+                customizableFields: Object.keys(defaultRepeaterStructure) as Array<keyof RepeaterStructure>,
             }
         default:
             throw new Error(`Unknown workout type ${workoutType}`)

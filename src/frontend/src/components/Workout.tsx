@@ -43,15 +43,13 @@ function InputWorkoutArm() {
 }
 
 
-function RepeaterStructureInput({repeaterStructure}: { repeaterStructure: RepeaterStructure }) {
-    return <>
-        <NumberInputRow field_id="numberSets" field_name="Number of sets" defaultValue={repeaterStructure.numberSets}/>
-        <NumberInputRow field_id="numberReps" field_name="Number of reps" defaultValue={repeaterStructure.numberReps}/>
-        <NumberInputRow field_id="countdown" field_name="Countdown [s]" defaultValue={repeaterStructure.countdown}/>
-        <NumberInputRow field_id="pullDuration" field_name="Pull duration [s]" defaultValue={repeaterStructure.pullDuration}/>
-        <NumberInputRow field_id="restRepsDuration" field_name="Rest between reps [s]" defaultValue={repeaterStructure.restRepsDuration}/>
-        <NumberInputRow field_id="restSetsDuration" field_name="Rest between sets [s]" defaultValue={repeaterStructure.restSetsDuration}/>
-    </>;
+const REPEATER_STRUCTURE_FIELD_NAMES: Record<keyof RepeaterStructure, string> = {
+    numberReps: "Number of reps",
+    numberSets: "Number of sets",
+    countdown: "Countdown [s]",
+    pullDuration: "Pull duration [s]",
+    restRepsDuration: "Rest between reps [s]",
+    restSetsDuration: "Rest between sets [s]",
 }
 
 function TargetWeightInput() {
@@ -112,25 +110,27 @@ function _Workout({workoutType, resetWorkout} : {
     const [repeaterStructure, setRepeaterStructure] = useState<RepeaterStructure>(workoutParams.repeaterStructure || defaultRepeaterStructure);
     const repeaterStructureRef = useRef<RepeaterStructure>(repeaterStructure);
     const testOrWorkout = workoutParams.isAssessment ? "test" : "workout"
+    const repeaterStructureKeys = Object.keys(repeaterStructure) as Array<keyof RepeaterStructure>;
 
 
     const startWorkout = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
+
         const workoutArm = formData.get("arm") as WorkoutArm;
 
-        if (!workoutParams.isAssessment) {
-            repeaterStructureRef.current = {
-                numberSets: Number(formData.get("numberSets")),
-                numberReps: Number(formData.get("numberReps")),
-                countdown: Number(formData.get("countdown")),
-                pullDuration: Number(formData.get("pullDuration")),
-                restRepsDuration: Number(formData.get("restRepsDuration")),
-                restSetsDuration: Number(formData.get("restSetsDuration")),
-            };
-            setRepeaterStructure(repeaterStructureRef.current)
+        repeaterStructureKeys.map(k => {
+            const v = formData.get(k);
+            if (v != null) {
+                repeaterStructure[k] = Number(v)
+            }
+        })
 
+        repeaterStructureRef.current = repeaterStructure;
+        setRepeaterStructure(repeaterStructure);
+
+        if (!workoutParams.isAssessment) {
             if (formData.get("targetWeightOrMaxPull") == "targetWeight") {
                 setTargetWeight(Number(formData.get("targetWeightValue")))
             } else {
@@ -315,8 +315,13 @@ function _Workout({workoutType, resetWorkout} : {
                                     <p>{workoutParams.workoutDescription}</p>
                                     <form onSubmit={startWorkout} className="d-grid gap-2">
                                         <InputWorkoutArm />
-                                        {workoutParams.isAssessment ||
-                                            <RepeaterStructureInput repeaterStructure={repeaterStructure}/>}
+                                        {(Object.entries(REPEATER_STRUCTURE_FIELD_NAMES) as Array<[keyof RepeaterStructure, string]>)
+                                            .filter(([k, _]) => workoutParams.customizableFields.includes(k))
+                                            .map(([k, v]) =>
+                                                <NumberInputRow key={k} field_id={k} field_name={v}
+                                                                defaultValue={repeaterStructure[k]}/>
+                                            )}
+
                                         {workoutParams.isAssessment || <TargetWeightInput/>}
                                         <button type="submit"
                                                 className="btn btn-primary btn-lg py-3 fw-bold rounded-3 shadow-sm">
