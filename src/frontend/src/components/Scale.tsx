@@ -42,23 +42,29 @@ export function resetMaxWeight() {
 }
 
 
+function getDiffOnTarget(currentWeight: number | null, targetWeight?: number | null) {
+    const diff = (currentWeight == null || targetWeight == null) ? 0 : currentWeight - targetWeight;
+    const onTarget = (currentWeight == null || targetWeight == null) ? false : Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
+    return {diff, onTarget};
+}
+
 function TargetWeightSlider({currentWeight, targetWeight}: {
-    currentWeight: number,
+    currentWeight: number | null,
     targetWeight: number
 }) {
+    const cw = currentWeight != null ? currentWeight : 0;
     const margin = targetWeight * 0.05;
-    const axisMin = Math.min(targetWeight * 0.75, currentWeight - margin);
-    const axisMax = Math.max(targetWeight * 1.25, currentWeight + margin);
+    const axisMin = Math.min(targetWeight * 0.75, cw - margin);
+    const axisMax = Math.max(targetWeight * 1.25, cw + margin);
     const axisSpan = axisMax - axisMin;
 
     const toPercent = (value: number) =>
         Math.min(100, Math.max(0, ((value - axisMin) / axisSpan) * 100));
 
     const targetPos = toPercent(targetWeight);
-    const currentPos = toPercent(currentWeight);
+    const currentPos = toPercent(cw);
 
-    const diff = currentWeight - targetWeight;
-    const onTarget = Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
+    const {diff, onTarget} = getDiffOnTarget(currentWeight, targetWeight);
 
     const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => axisMin + f * axisSpan);
 
@@ -86,14 +92,16 @@ function TargetWeightSlider({currentWeight, targetWeight}: {
 
             {/* Axis */}
             <div className="position-relative rounded-pill bg-secondary" style={{height: '8px'}}>
-                <div
-                    className={`rounded-pill bg-${bootstrapColor}`}
-                    style={{
-                        width: `${currentPos}%`,
-                        height: '100%',
-                        transition: 'width 0.2s linear',
-                    }}
-                />
+                {currentWeight != null &&
+                    <div
+                        className={`rounded-pill bg-${bootstrapColor}`}
+                        style={{
+                            width: `${currentPos}%`,
+                            height: '100%',
+                            transition: 'width 0.2s linear',
+                        }}
+                    />
+                }
                 <div
                     className="bg-info"
                     style={{
@@ -125,27 +133,29 @@ function TargetWeightSlider({currentWeight, targetWeight}: {
             </div>
 
             {/* Lower arrow */}
-            <div style={{position: 'relative', height: '3.2rem'}}>
-                <div className={`text-${bootstrapColor} text-center`}
-                     style={{
-                         ...arrowBaseStyle,
-                         left: `${currentPos}%`,
-                         top: 0,
-                         transition: 'left 0.2s linear',
-                     }}>
-                    <div>▲</div>
-                    <div className="small fw-bold text-uppercase" style={{fontSize: '0.65rem'}}>
-                        {currentWeight.toFixed(2)}
+            {currentWeight != null &&
+                <div style={{position: 'relative', height: '3.2rem'}}>
+                    <div className={`text-${bootstrapColor} text-center`}
+                         style={{
+                             ...arrowBaseStyle,
+                             left: `${currentPos}%`,
+                             top: 0,
+                             transition: 'left 0.2s linear',
+                         }}>
+                        <div>▲</div>
+                        <div className="small fw-bold text-uppercase" style={{fontSize: '0.65rem'}}>
+                            {currentWeight.toFixed(2)}
+                        </div>
                     </div>
                 </div>
-            </div>
+            }
         </div>
     );
 }
 
 export function Scale({displayMaxWeight, targetWeight}: {
     displayMaxWeight: boolean,
-    targetWeight?: number | null
+    targetWeight: number | null
 }) {
     const [currentWeight, setCurrentWeight] = useState<number | null>(null);
     const [maxWeight, setMaxWeight] = useState<number | null>(null);
@@ -208,9 +218,9 @@ export function Scale({displayMaxWeight, targetWeight}: {
         }
     }
 
-    const showSlider = currentWeight != null && targetWeight != null && targetWeight >= 0;
-    const diff = (currentWeight == null || targetWeight == null) ? 0 : currentWeight - targetWeight;
-    const onTarget = (currentWeight == null || targetWeight == null) ? false : Math.abs(diff) <= targetWeight * config.TARGET_WEIGHT_TOLERANCE;
+    const showSlider = targetWeight != null && targetWeight >= 0;
+    const {diff, onTarget} = getDiffOnTarget(currentWeight, targetWeight);
+
 
     return (
         <div className="bg-black border border-dark rounded-3 p-4 text-center mb-4 shadow-inner">

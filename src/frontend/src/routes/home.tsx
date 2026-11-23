@@ -42,7 +42,7 @@ export default function Home(): React.JSX.Element {
 
 
   const handleToggleUseTargetWeight = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUseTargetWeight(e.target.checked);
+    setUseTargetWeight(e.currentTarget.checked);
   }
 
   const handleChangeTargetWeight = (e: React.ChangeEvent<HTMLInputElement>)=> {
